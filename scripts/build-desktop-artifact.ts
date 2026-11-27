@@ -3071,8 +3071,16 @@ export const createBuildConfig = Effect.fn("createBuildConfig")(function* (
     const path = yield* Path.Path;
     const repoRoot = yield* RepoRoot;
     buildConfig.afterPack = path.join(repoRoot, "scripts/linux-after-pack.ts");
+    const linuxTargets = target.includes(",")
+      ? target
+          .split(",")
+          .map((entry) => entry.trim())
+          .filter((entry) => entry.length > 0)
+      : target === "AppImage"
+        ? [target, "deb"]
+        : [target];
     buildConfig.linux = {
-      target: target === "AppImage" ? [target, "deb"] : [target],
+      target: linuxTargets,
       executableName: "zerocode",
       icon: "icons",
       category: "Development",

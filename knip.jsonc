@@ -39,6 +39,7 @@
         // e2e loads its config and the scenarios by path, and starts the app script.
         "e2e.config.ts",
         "prove-scenario.ts",
+        "resolve-nightly-release.ts",
         "scenarios/*.ts",
         "setup-worktree.ts",
         "sign-macos.ts",

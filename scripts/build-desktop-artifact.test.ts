@@ -615,6 +615,26 @@ it.layer(NodeServices.layer)("build-desktop-artifact", (it) => {
       }),
   );
 
+  it.effect("splits comma-separated Linux targets into one electron-builder run", () =>
+    Effect.gen(function* () {
+      const config = yield* createBuildConfig(
+        "linux",
+        "AppImage,deb,rpm",
+        "0.1.17",
+        false,
+        false,
+        undefined,
+        undefined,
+      );
+
+      assert.deepEqual((config.linux as { target: ReadonlyArray<string> }).target, [
+        "AppImage",
+        "deb",
+        "rpm",
+      ]);
+    }),
+  );
+
   it("excludes build-time patches, duplicate runtime binaries, and unused @cursor/sdk builds from desktop packages", () => {
     const excludedDesktop = (file: string) =>
       DESKTOP_FILE_EXCLUSIONS.some((glob) => NodePath.matchesGlob(file, glob.slice(1)));
