@@ -288,10 +288,16 @@ jobs:
       # Off Windows, scripts/lib/windows-jsign.ts signs through jsign instead of
       # the TrustedSigning PowerShell module.
       - name: Install jsign
-        if: inputs.platform == 'win' && secrets.AZURE_TENANT_ID != ''
+        if: inputs.platform == 'win'
         shell: bash
+        env:
+          AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
         run: |
           set -euo pipefail
+          if [[ -z "${AZURE_TENANT_ID:-}" ]]; then
+            echo "Skipping jsign install (Windows signing disabled)."
+            exit 0
+          fi
           dir="$RUNNER_TEMP/jsign"
           mkdir -p "$dir"
           curl -fsSL --retry 3 -o "$dir/jsign.jar" https://github.com/ebourg/jsign/releases/download/7.6/jsign-7.6.jar
