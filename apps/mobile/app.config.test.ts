@@ -6,7 +6,11 @@ import assetLinks from "../web/public/.well-known/assetlinks.json";
 
 // Keep config parsing independent of local env files and build credentials.
 vi.mock("../../scripts/lib/public-config.ts", () => ({
-  loadRepoEnv: () => ({ APP_VARIANT: process.env.APP_VARIANT }),
+  loadRepoEnv: () => ({
+    APP_VARIANT: process.env.APP_VARIANT,
+    ZEROCODE_MOBILE_VERSION: process.env.ZEROCODE_MOBILE_VERSION,
+    ZEROCODE_MOBILE_ANDROID_VERSION_CODE: process.env.ZEROCODE_MOBILE_ANDROID_VERSION_CODE,
+  }),
 }));
 
 afterEach(() => {
@@ -44,4 +48,16 @@ it.each([
     { scheme: "https", host, pathPrefix: "/threads/" },
   ]);
   expect(assetLinks.map((link) => link.target.package_name)).toContain(identifier);
+});
+
+it("applies ZEROCODE_MOBILE_VERSION and positive integer ZEROCODE_MOBILE_ANDROID_VERSION_CODE", async () => {
+  vi.stubEnv("ZEROCODE_MOBILE_VERSION", "0.1.18");
+  vi.stubEnv("ZEROCODE_MOBILE_ANDROID_VERSION_CODE", "1018");
+  const config = await loadConfig("production");
+  expect(config.version).toBe("0.1.18");
+  expect(config.android?.versionCode).toBe(1018);
+
+  vi.stubEnv("ZEROCODE_MOBILE_ANDROID_VERSION_CODE", "invalid");
+  const invalidConfig = await loadConfig("production");
+  expect(invalidConfig.android?.versionCode).toBeUndefined();
 });

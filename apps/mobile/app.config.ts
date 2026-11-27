@@ -21,6 +21,17 @@ const IOS_BUNDLE_IDENTIFIER_PATTERN = /^[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)+$/;
 const easProjectId =
   repoEnv.ZEROCODE_EAS_PROJECT_ID?.trim() || "00000000-0000-0000-0000-000000000000";
 const appleTeamId = repoEnv.ZEROCODE_APPLE_TEAM_ID?.trim() || "TEAMID0000";
+const rawAndroidVersionCode = repoEnv.ZEROCODE_MOBILE_ANDROID_VERSION_CODE?.trim();
+const parsedAndroidVersionCode =
+  rawAndroidVersionCode && /^\d+$/.test(rawAndroidVersionCode)
+    ? Number.parseInt(rawAndroidVersionCode, 10)
+    : undefined;
+const androidVersionCode =
+  parsedAndroidVersionCode !== undefined &&
+  Number.isSafeInteger(parsedAndroidVersionCode) &&
+  parsedAndroidVersionCode > 0
+    ? parsedAndroidVersionCode
+    : undefined;
 
 const fromRepoRoot = (relativePath: string) => `../../${relativePath}`;
 const androidAdaptiveForeground = "./assets/android-icon-foreground.png";
@@ -298,6 +309,7 @@ const config: ExpoConfig = {
   android: {
     icon: variant.assets.appIcon,
     package: variant.androidPackage,
+    ...(androidVersionCode !== undefined ? { versionCode: androidVersionCode } : {}),
     ...(repoEnv.ZEROCODE_ANDROID_GOOGLE_SERVICES_FILE
       ? { googleServicesFile: repoEnv.ZEROCODE_ANDROID_GOOGLE_SERVICES_FILE }
       : {}),

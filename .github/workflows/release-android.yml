@@ -1,0 +1,216 @@
+name: Build Android Release APK
+
+# Builds a standalone production Android APK (arm64-v8a + armeabi-v7a) on
+# GitHub-hosted Ubuntu runners without requiring EAS or Google Play credentials.
+# Signs with an optional release keystore if configured via secrets, or falls
+# back to Expo's deterministic keystore so APKs remain installable and upgradeable.
+
+on:
+  workflow_call:
+    inputs:
+      version:
+        description: Release version (for example 0.1.18)
+        required: true
+        type: string
+      ref:
+        description: Git ref or commit SHA to build
+        required: true
+        type: string
+      release_channel:
+        description: Release channel (stable or nightly)
+        required: false
+        default: stable
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  build_android_apk:
+    name: Build Android APK
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    env:
+      APP_VARIANT: production
+      NODE_ENV: production
+      NODE_OPTIONS: --max-old-space-size=6144
+      EXPO_NO_GIT_STATUS: "1"
+      EXPO_NO_TELEMETRY: "1"
+      MOBILE_VERSION_POLICY: appVersion
+      ZEROCODE_MOBILE_VERSION: ${{ inputs.version }}
+      ZEROCODE_MOBILE_UPDATES_ENABLED: "0"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          ref: ${{ inputs.ref }}
+          sparse-checkout: |
+            /*
+            !/.repos/
+          sparse-checkout-cone-mode: false
+
+      - name: Setup dependencies
+        uses: ./.github/actions/setup-ci-deps
+        with:
+          install-args: --filter=@zerocode/mobile... --filter=@zerocode/scripts...
+          save-pnpm-store: false
+
+      - name: Setup Java
+        uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5.7.0
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Restore Gradle cache
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: android-release-gradle-v1-${{ hashFiles('apps/mobile/package.json', 'apps/mobile/app.config.ts', 'pnpm-lock.yaml') }}
+          restore-keys: |
+            android-release-gradle-v1-
+
+      - name: Restore ccache
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.cache/zerocode-android-release-ccache
+          key: android-release-ccache-v1-${{ hashFiles('apps/mobile/modules/**/CMakeLists.txt', 'apps/mobile/package.json', 'pnpm-lock.yaml') }}
+          restore-keys: |
+            android-release-ccache-v1-
+
+      - name: Configure Gradle, ccache, and Android SDK licenses
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq && sudo apt-get install -y -qq ccache
+          mkdir -p "$HOME/.gradle" "$HOME/.cache/zerocode-android-release-ccache"
+          cat > "$HOME/.gradle/gradle.properties" <<'EOF'
+          org.gradle.caching=true
+          org.gradle.daemon=false
+          org.gradle.workers.max=4
+          EOF
+          {
+            echo "CCACHE_DIR=$HOME/.cache/zerocode-android-release-ccache"
+            echo "CCACHE_MAXSIZE=4G"
+            echo "CCACHE_COMPILERCHECK=%compiler% -v"
+            echo "CCACHE_BASEDIR=$GITHUB_WORKSPACE"
+            echo "CMAKE_C_COMPILER_LAUNCHER=ccache"
+            echo "CMAKE_CXX_COMPILER_LAUNCHER=ccache"
+          } >> "$GITHUB_ENV"
+          ccache --zero-stats
+
+          if [[ -n "${ANDROID_HOME:-}" && -x "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" ]]; then
+            yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses >/dev/null || true
+          fi
+
+      - id: version_code
+        name: Compute Android versionCode
+        shell: bash
+        env:
+          RELEASE_VERSION: ${{ inputs.version }}
+        run: |
+          set -euo pipefail
+          core="${RELEASE_VERSION%%[-+]*}"
+          IFS=. read -r major minor patch <<< "$core"
+          major="${major:-0}"
+          minor="${minor:-0}"
+          patch="${patch:-0}"
+          code=$(( major * 1000000 + minor * 1000 + patch ))
+          if (( code <= 0 )); then
+            code=1
+          fi
+          echo "code=$code" >> "$GITHUB_OUTPUT"
+          echo "ZEROCODE_MOBILE_ANDROID_VERSION_CODE=$code" >> "$GITHUB_ENV"
+          echo "Resolved Android versionName=$RELEASE_VERSION versionCode=$code"
+
+      - name: Prebuild Android project
+        working-directory: apps/mobile
+        run: vp exec expo prebuild --clean --platform android --no-install
+
+      - name: Build Android release APK
+        working-directory: apps/mobile/android
+        run: |
+          set -euo pipefail
+          ./gradlew :app:assembleRelease \
+            -x lintVitalAnalyzeRelease \
+            -x lintVitalRelease \
+            -PreactNativeArchitectures=armeabi-v7a,arm64-v8a \
+            --no-daemon \
+            --stacktrace
+
+      - name: Sign and verify APK
+        shell: bash
+        env:
+          RELEASE_VERSION: ${{ inputs.version }}
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          raw_apk="apps/mobile/android/app/build/outputs/apk/release/app-release.apk"
+          if [[ ! -f "$raw_apk" ]]; then
+            echo "Expected release APK at $raw_apk" >&2
+            ls -la apps/mobile/android/app/build/outputs/apk/release/ || true
+            exit 1
+          fi
+
+          mkdir -p release-android
+          out_apk="release-android/ZeroCode-Android-${RELEASE_VERSION}.apk"
+
+          apksigner="$(find "${ANDROID_HOME:-/usr/local/lib/android/sdk}/build-tools" -maxdepth 2 -name apksigner -type f | sort -V | tail -n 1 || true)"
+          if [[ -z "$apksigner" ]]; then
+            echo "apksigner not found under ANDROID_HOME" >&2
+            exit 1
+          fi
+
+          if [[ -n "$ANDROID_KEYSTORE_BASE64" && -n "$ANDROID_KEYSTORE_PASSWORD" && -n "$ANDROID_KEY_ALIAS" && -n "$ANDROID_KEY_PASSWORD" ]]; then
+            keystore="$RUNNER_TEMP/release.keystore"
+            trap 'rm -f "$keystore"' EXIT
+            printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 -d > "$keystore"
+            "$apksigner" sign \
+              --ks "$keystore" \
+              --ks-pass env:ANDROID_KEYSTORE_PASSWORD \
+              --ks-key-alias "$ANDROID_KEY_ALIAS" \
+              --key-pass env:ANDROID_KEY_PASSWORD \
+              --out "$out_apk" \
+              "$raw_apk"
+            echo "Signed $out_apk with configured release keystore."
+          else
+            cp "$raw_apk" "$out_apk"
+            echo "Using Gradle default signing for $out_apk (set ANDROID_KEYSTORE_* secrets for custom release signing)."
+          fi
+
+          "$apksigner" verify --print-certs "$out_apk"
+
+          abis="$(unzip -Z1 "$out_apk" | sed -n 's|^lib/\([^/]*\)/.*|\1|p' | sort -u | paste -sd, -)"
+          echo "APK ABIs: $abis"
+          if [[ "$abis" != "arm64-v8a,armeabi-v7a" ]]; then
+            echo "Expected arm64-v8a,armeabi-v7a in $out_apk, found: $abis" >&2
+            exit 1
+          fi
+          if ! unzip -Z1 "$out_apk" | grep -qx 'assets/index.android.bundle'; then
+            echo "Missing embedded JS bundle assets/index.android.bundle in $out_apk" >&2
+            exit 1
+          fi
+          ls -lh "$out_apk"
+          echo "### Android APK: \`ZeroCode-Android-${RELEASE_VERSION}.apk\` (\`$abis\`, versionCode \`${ZEROCODE_MOBILE_ANDROID_VERSION_CODE}\`)" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Report ccache statistics
+        if: success() || failure()
+        continue-on-error: true
+        run: |
+          {
+            echo '```'
+            ccache --show-stats
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload Android APK artifact
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: mobile-android-apk
+          path: release-android/ZeroCode-Android-${{ inputs.version }}.apk
+          if-no-files-found: error
+          retention-days: 7

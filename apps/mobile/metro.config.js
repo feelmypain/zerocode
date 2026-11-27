@@ -38,8 +38,17 @@ config.transformer = {
 };
 
 config.watchFolders = [...new Set([...(config.watchFolders ?? []), workspaceRoot])];
+const defaultResolveRequest = config.resolver?.resolveRequest;
 config.resolver = {
   ...config.resolver,
+  // Workspace packages are ESM-only with `"import"` exports, while `inlineRequires` lowers imports to CJS `require()`.
+  resolveRequest: (context, moduleName, platform) => {
+    const resolve = defaultResolveRequest ?? context.resolveRequest;
+    if (moduleName.startsWith("@zerocode/")) {
+      return resolve({ ...context, isESMImport: true }, moduleName, platform);
+    }
+    return resolve(context, moduleName, platform);
+  },
   blockList: [
     ...(Array.isArray(config.resolver?.blockList)
       ? config.resolver.blockList
