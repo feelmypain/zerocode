@@ -1,0 +1,9 @@
+src/
+pkg/
+*.AppImage
+*.pkg.tar.zst
+.SRCINFO
+zerocode-bin-*.png
+zerocode-bin-*-LICENSE
+zerocode-nightly-bin-*.png
+zerocode-nightly-bin-*-LICENSE

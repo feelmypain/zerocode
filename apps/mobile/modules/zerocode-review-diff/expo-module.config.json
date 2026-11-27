@@ -1,0 +1,10 @@
+{
+  "platforms": ["apple", "android"],
+  "apple": {
+    "modules": ["ZeroCodeReviewDiffModule"],
+    "podspecPath": "ZeroCodeReviewDiffNative.podspec"
+  },
+  "android": {
+    "modules": ["expo.modules.zerocodereviewdiff.ZeroCodeReviewDiffModule"]
+  }
+}

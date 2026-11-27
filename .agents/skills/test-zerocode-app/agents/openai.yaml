@@ -1,0 +1,4 @@
+interface:
+  display_name: "ZeroCode App Testing"
+  short_description: "Test web and desktop in ZeroCode's Browser panel"
+  default_prompt: "Use $test-zerocode-app to verify the affected web or desktop flow through ZeroCode's Browser panel."

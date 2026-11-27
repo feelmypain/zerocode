@@ -1,0 +1,20 @@
+{
+  "platforms": ["apple", "android"],
+  "apple": {
+    "modules": ["ZeroCodeNativeControlsModule", "ZeroCodeKeyboardCommandsModule"],
+    "appDelegateSubscribers": [
+      "ZeroCodeWorkspaceOrientationSubscriber",
+      "ZeroCodeMenuDismissTouchGateSubscriber",
+      "ZeroCodeBackgroundGraceSubscriber"
+    ]
+  },
+  "android": {
+    "modules": [
+      "expo.modules.zerocodenativecontrols.ZeroCodeNativeControlsModule",
+      "expo.modules.zerocodenativecontrols.ZeroCodeWorkspaceNavigationModule",
+      "expo.modules.zerocodenativecontrols.ZeroCodeKeyboardCommandsModule",
+      "expo.modules.zerocodenativecontrols.ZeroCodeFoldPostureModule",
+      "expo.modules.zerocodenativecontrols.ZeroCodeSecretInputModule"
+    ]
+  }
+}

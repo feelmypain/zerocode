@@ -1,0 +1,10 @@
+{
+  "platforms": ["apple", "android"],
+  "apple": {
+    "modules": ["ZeroCodeVoiceTranscriptionModule"],
+    "podspecPath": "ios/ZeroCodeVoiceTranscription.podspec"
+  },
+  "android": {
+    "modules": ["expo.modules.zerocodevoicetranscription.ZeroCodeVoiceTranscriptionModule"]
+  }
+}

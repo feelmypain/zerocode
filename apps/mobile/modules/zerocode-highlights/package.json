@@ -1,0 +1,9 @@
+{
+  "name": "@zerocode/mobile-highlights-native",
+  "version": "0.0.0",
+  "private": true,
+  "types": "./src/ZeroCodeHighlights.nitro.ts",
+  "peerDependencies": {
+    "react-native-nitro-modules": "*"
+  }
+}

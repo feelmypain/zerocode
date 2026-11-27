@@ -1,0 +1,102 @@
+{
+  "name": "@zerocode/contracts",
+  "version": "0.1.15",
+  "private": true,
+  "files": [
+    "dist"
+  ],
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "import": "./src/index.ts"
+    },
+    "./ids": {
+      "types": "./src/baseSchemas.ts",
+      "import": "./src/baseSchemas.ts"
+    },
+    "./desktop": {
+      "types": "./src/entries/desktop.ts",
+      "import": "./src/entries/desktop.ts"
+    },
+    "./ipc": {
+      "types": "./src/ipc.ts",
+      "import": "./src/ipc.ts"
+    },
+    "./chat-attachment": {
+      "types": "./src/chatAttachment.ts",
+      "import": "./src/chatAttachment.ts"
+    },
+    "./preview": {
+      "types": "./src/entries/preview.ts",
+      "import": "./src/entries/preview.ts"
+    },
+    "./auth": {
+      "types": "./src/entries/auth.ts",
+      "import": "./src/entries/auth.ts"
+    },
+    "./environment-http": {
+      "types": "./src/environmentHttp.ts",
+      "import": "./src/environmentHttp.ts"
+    },
+    "./server": {
+      "types": "./src/entries/server.ts",
+      "import": "./src/entries/server.ts"
+    },
+    "./settings": {
+      "types": "./src/settings.ts",
+      "import": "./src/settings.ts"
+    },
+    "./relay": {
+      "types": "./src/relay.ts",
+      "import": "./src/relay.ts"
+    },
+    "./orchestration": {
+      "types": "./src/entries/orchestration.ts",
+      "import": "./src/entries/orchestration.ts"
+    },
+    "./rpc": {
+      "types": "./src/rpc.ts",
+      "import": "./src/rpc.ts"
+    },
+    "./rpc-permissions": {
+      "types": "./src/clientRpcPermissions.ts",
+      "import": "./src/clientRpcPermissions.ts"
+    },
+    "./mcp": {
+      "types": "./src/entries/mcp.ts",
+      "import": "./src/entries/mcp.ts"
+    },
+    "./pull-request": {
+      "types": "./src/entries/pullRequest.ts",
+      "import": "./src/entries/pullRequest.ts"
+    },
+    "./vcs": {
+      "types": "./src/entries/vcs.ts",
+      "import": "./src/entries/vcs.ts"
+    },
+    "./provider": {
+      "types": "./src/entries/provider.ts",
+      "import": "./src/entries/provider.ts"
+    },
+    "./terminal": {
+      "types": "./src/terminal.ts",
+      "import": "./src/terminal.ts"
+    },
+    "./project": {
+      "types": "./src/entries/project.ts",
+      "import": "./src/entries/project.ts"
+    }
+  },
+  "scripts": {
+    "typecheck": "effect-tsgo tsrs --noEmit",
+    "test": "vp test run --config ../../vite.config.ts --dir ."
+  },
+  "dependencies": {
+    "effect": "catalog:"
+  },
+  "devDependencies": {
+    "@effect/vitest": "catalog:",
+    "vite-plus": "catalog:"
+  }
+}

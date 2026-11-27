@@ -1,0 +1,9 @@
+{
+  "platforms": ["apple", "android"],
+  "apple": {
+    "modules": ["ZeroCodeComposerEditorModule"]
+  },
+  "android": {
+    "modules": ["expo.modules.zerocodecomposereditor.ZeroCodeComposerEditorModule"]
+  }
+}

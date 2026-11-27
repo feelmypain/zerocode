@@ -1,0 +1,30 @@
+import type { ColorValue } from "react-native";
+import Svg, { Path } from "react-native-svg";
+import { withUniwind } from "uniwind";
+
+const ThemedPath = withUniwind(Path);
+
+export function ZeroCodeWordmark(props: {
+  readonly height: number;
+  readonly color?: ColorValue;
+  readonly colorClassName?: string;
+}) {
+  const aspectRatio = 76 / 96;
+  return (
+    <Svg
+      accessibilityLabel="ZeroCode"
+      height={props.height}
+      width={props.height * aspectRatio}
+      viewBox="26 16 76 96"
+    >
+      <ThemedPath
+        d="M64 16C40 16 26 30 26 54V74C26 98 40 112 64 112C88 112 102 98 102 74V54C102 30 88 16 64 16ZM84 44.5L47.5 89.2C52.1 93.1 57.7 95 64 95C78.5 95 85 87.2 85 73V54C85 50.4 84.7 47.2 84 44.5ZM44 83.5L80.5 38.8C75.9 34.9 70.3 33 64 33C49.5 33 43 40.8 43 55V74C43 77.6 43.3 80.8 44 83.5Z"
+        fillRule="evenodd"
+        clipRule="evenodd"
+        color={props.color}
+        colorClassName={props.colorClassName}
+        fill="currentColor"
+      />
+    </Svg>
+  );
+}

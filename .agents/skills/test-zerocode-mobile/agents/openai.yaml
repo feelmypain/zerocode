@@ -1,0 +1,4 @@
+interface:
+  display_name: "Test ZeroCode Mobile"
+  short_description: "Test iOS and Android in ZeroCode's Device panel"
+  default_prompt: "Use $test-zerocode-mobile to verify the affected native mobile flow through ZeroCode's Device panel and AgentDevice."

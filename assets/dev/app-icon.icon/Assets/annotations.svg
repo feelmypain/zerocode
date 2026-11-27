@@ -1,0 +1,39 @@
+<svg width="128" height="128" viewBox="0 0 128 128" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <marker id="arrowStart" markerWidth="5" markerHeight="5" refX="1.2" refY="2.5" orient="auto" markerUnits="strokeWidth">
+      <path d="M4.5 0.6L1 2.5L4.5 4.4" fill="none" stroke="#DDF7FF" stroke-width="0.8" stroke-linecap="round"/>
+    </marker>
+    <marker id="arrowEnd" markerWidth="5" markerHeight="5" refX="3.8" refY="2.5" orient="auto" markerUnits="strokeWidth">
+      <path d="M0.5 0.6L4 2.5L0.5 4.4" fill="none" stroke="#DDF7FF" stroke-width="0.8" stroke-linecap="round"/>
+    </marker>
+  </defs>
+
+  <g stroke="#DDF7FF" stroke-linecap="round" stroke-linejoin="round">
+    <g opacity="0.9" stroke-width="0.44">
+      <path d="M26 13.5V9M102 13.5V9"/>
+      <path d="M27.4 10.8H100.6" marker-start="url(#arrowStart)" marker-end="url(#arrowEnd)"/>
+      <path d="M26 114.5V119M43 114.5V119M85 114.5V119M102 114.5V119"/>
+      <path d="M27.4 117.2H41.6" marker-start="url(#arrowStart)" marker-end="url(#arrowEnd)"/>
+      <path d="M44.4 117.2H83.6" marker-start="url(#arrowStart)" marker-end="url(#arrowEnd)"/>
+      <path d="M86.4 117.2H100.6" marker-start="url(#arrowStart)" marker-end="url(#arrowEnd)"/>
+      <path d="M21 16H14.5M21 33H14.5M21 112H14.5"/>
+      <path d="M16.5 17.4V31.6" marker-start="url(#arrowStart)" marker-end="url(#arrowEnd)"/>
+      <path d="M16.5 34.4V110.6" marker-start="url(#arrowStart)" marker-end="url(#arrowEnd)"/>
+    </g>
+
+    <g opacity="0.58" stroke-width="0.34">
+      <path d="M21 16H107M21 112H107" stroke-dasharray="1.6 1.6"/>
+      <path d="M18 64H112M64 13V115" stroke-dasharray="1.2 2"/>
+      <path d="M24 113L104 15" stroke-dasharray="1.6 1.6"/>
+      <circle cx="64" cy="64" r="38"/>
+      <circle cx="64" cy="64" r="21" stroke-dasharray="1.4 1.8"/>
+      <circle cx="64" cy="64" r="1.2"/>
+    </g>
+
+    <g opacity="0.76" stroke-width="0.4">
+      <path d="M16 10V14M14 12H18M111 18V22M109 20H113M111 106V110M109 108H113"/>
+      <path d="M110 42L113 45M113 42L110 45M20 93L23 96M23 93L20 96"/>
+      <path d="M107 64H115M111 60V68" stroke-dasharray="0.7 1.1"/>
+    </g>
+  </g>
+</svg>

@@ -1,0 +1,26 @@
+<?xml version="1.0"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="864" viewBox="0 0 640 432">
+  <defs>
+    <linearGradient id="veil" x1="0" y1="0" x2="0" y2="1">
+      <stop stop-color="#B7B7B7" stop-opacity="0"/>
+      <stop offset=".55" stop-color="#A5A5A5" stop-opacity=".24"/>
+      <stop offset="1" stop-color="#D1D1D1" stop-opacity=".4"/>
+    </linearGradient>
+    <linearGradient id="silk" x1="0" y1="0" x2="1" y2="0">
+      <stop stop-color="#C8C8C8"/>
+      <stop offset=".5" stop-color="#DBDBDB"/>
+      <stop offset="1" stop-color="#B5B5B5"/>
+    </linearGradient>
+  </defs>
+  <rect width="640" height="432" fill="#E9E9EB"/>
+  <path d="M-60 293C95 220 214 304 362 256S559 191 707 257" stroke="url(#veil)" stroke-width="146" fill="none" opacity="1" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M-60 306C113 252 223 298 367 272S553 242 707 280" stroke="url(#silk)" stroke-width="86" fill="none" opacity="1" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M-60 266C113 212 223 258 367 232S553 202 707 240" stroke="#F5F5F5" stroke-width="0.8" fill="none" opacity="0.42" stroke-linecap="round" stroke-linejoin="round"/>
+  <!-- Official mark from apps/web/src/components/ZeroCodeWordmark.tsx. -->
+  <svg x="32" y="21" width="20" height="25" viewBox="26 16 76 96" fill="#303034">
+    <path fill-rule="evenodd" clip-rule="evenodd" d="M64 16C40 16 26 30 26 54V74C26 98 40 112 64 112C88 112 102 98 102 74V54C102 30 88 16 64 16ZM84 44.5L47.5 89.2C52.1 93.1 57.7 95 64 95C78.5 95 85 87.2 85 73V54C85 50.4 84.7 47.2 84 44.5ZM44 83.5L80.5 38.8C75.9 34.9 70.3 33 64 33C49.5 33 43 40.8 43 55V74C43 77.6 43.3 80.8 44 83.5Z"/>
+  </svg>
+  <text x="320" y="104" fill="#303034" font-family="Helvetica" font-size="23" font-weight="700" text-anchor="middle">Drag ZeroCode into Applications.</text>
+  <path d="M270 204Q320 179 370 204M358 190L370 204L351 209" stroke="#505057" stroke-width="2.2" fill="none" opacity="1" stroke-linecap="round" stroke-linejoin="round"/>
+  <text x="320" y="367" fill="#626269" font-family="Helvetica" font-size="12" font-weight="400" text-anchor="middle">Once copied, open it from Applications.</text>
+</svg>

@@ -1,0 +1,17 @@
+{
+  "name": "@zerocode/mobile-terminal-native",
+  "version": "0.0.0",
+  "private": true,
+  "expo-module": {
+    "ios": {
+      "modules": [
+        "ZeroCodeTerminalModule"
+      ]
+    },
+    "android": {
+      "modules": [
+        "expo.modules.zerocodeterminal.ZeroCodeTerminalModule"
+      ]
+    }
+  }
+}

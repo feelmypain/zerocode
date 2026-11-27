@@ -1,0 +1,74 @@
+@import "tailwindcss";
+
+@theme inline {
+  --font-sans: var(--zerocode-font-sans);
+  --font-mono: var(--zerocode-font-mono);
+  --color-background: var(--zerocode-background);
+  --color-foreground: var(--zerocode-foreground);
+  --color-popover: var(--zerocode-popover);
+  --color-popover-foreground: var(--zerocode-popover-foreground);
+  --color-primary: var(--zerocode-primary);
+  --color-primary-foreground: var(--zerocode-primary-foreground);
+  --color-muted: var(--zerocode-muted);
+  --color-muted-foreground: var(--zerocode-muted-foreground);
+  --color-accent: var(--zerocode-accent);
+  --color-accent-foreground: var(--zerocode-accent-foreground);
+  --color-border: var(--zerocode-border);
+  --color-input: var(--zerocode-input);
+  --color-ring: var(--zerocode-ring);
+  --radius-sm: calc(var(--zerocode-radius) - 4px);
+  --radius-md: calc(var(--zerocode-radius) - 2px);
+  --radius-lg: var(--zerocode-radius);
+  --radius-xl: calc(var(--zerocode-radius) + 4px);
+  --radius-2xl: calc(var(--zerocode-radius) + 8px);
+}
+
+:host {
+  --zerocode-font-sans:
+    "DM Sans Variable", "DM Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui,
+    sans-serif;
+  --zerocode-font-mono:
+    "SF Mono", "SFMono-Regular", "JetBrains Mono", Consolas, "Liberation Mono", Menlo, monospace;
+  --zerocode-radius: 0.625rem;
+  --zerocode-background: white;
+  --zerocode-foreground: oklch(0.269 0 0);
+  --zerocode-popover: white;
+  --zerocode-popover-foreground: oklch(0.269 0 0);
+  --zerocode-primary: oklch(0.488 0.217 264);
+  --zerocode-primary-foreground: white;
+  --zerocode-destructive: oklch(0.577 0.245 27.325);
+  --zerocode-muted: rgb(0 0 0 / 4%);
+  --zerocode-muted-foreground: oklch(0.556 0 0);
+  --zerocode-accent: rgb(0 0 0 / 4%);
+  --zerocode-accent-foreground: oklch(0.269 0 0);
+  --zerocode-border: rgb(0 0 0 / 8%);
+  --zerocode-input: rgb(0 0 0 / 10%);
+  --zerocode-ring: oklch(0.488 0.217 264);
+  color: var(--zerocode-foreground);
+  font-family: var(--zerocode-font-sans);
+}
+
+* {
+  box-sizing: border-box;
+  border-color: var(--zerocode-border);
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--zerocode-ring) 72%, transparent);
+  outline-offset: -2px;
+}
+
+/* Utility display classes must not override the native hidden state. */
+[hidden] {
+  display: none !important;
+}

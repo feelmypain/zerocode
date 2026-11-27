@@ -1,0 +1,14 @@
+{
+  "applinks": {
+    "details": [
+      {
+        "appIDs": [
+          "TEAMID0000.com.zerocode.app",
+          "TEAMID0000.com.zerocode.app.preview",
+          "TEAMID0000.com.zerocode.app.dev"
+        ],
+        "components": [{ "/": "/threads/*" }]
+      }
+    ]
+  }
+}
