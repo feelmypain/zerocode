@@ -212,6 +212,13 @@ jobs:
           path: native/resource-monitor/target/${{ inputs.rust_target }}/release/zerocode-resource-monitor${{ inputs.platform == 'win' && '.exe' || '' }}
           key: resource-monitor-${{ inputs.rust_target }}-${{ hashFiles('.cargo/config.toml', 'native/resource-monitor/Cargo.lock', 'native/resource-monitor/Cargo.toml', 'native/resource-monitor/src/**') }}
 
+      - name: Cache transcript scanner
+        id: transcript_scanner_cache
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: native/transcript-scanner/target/${{ inputs.rust_target }}/release/zerocode-transcript-scanner${{ inputs.platform == 'win' && '.exe' || '' }}
+          key: transcript-scanner-${{ inputs.rust_target }}-${{ hashFiles('.cargo/config.toml', 'native/transcript-scanner/Cargo.lock', 'native/transcript-scanner/Cargo.toml', 'native/transcript-scanner/src/**') }}
+
       - name: Cache Linux capture helpers
         if: inputs.platform == 'linux'
         id: capture_helper_cache
@@ -245,7 +252,7 @@ jobs:
           fi
 
       - name: Setup Rust
-        if: steps.resource_monitor_cache.outputs.cache-hit != 'true' || (inputs.platform == 'linux' && steps.capture_helper_cache.outputs.cache-hit != 'true')
+        if: steps.resource_monitor_cache.outputs.cache-hit != 'true' || steps.transcript_scanner_cache.outputs.cache-hit != 'true' || (inputs.platform == 'linux' && steps.capture_helper_cache.outputs.cache-hit != 'true')
         uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # master
         with:
           toolchain: stable
@@ -273,10 +280,18 @@ jobs:
           fi
 
       - name: Install cargo-xwin
-        if: inputs.platform == 'win' && steps.resource_monitor_cache.outputs.cache-hit != 'true'
+        if: inputs.platform == 'win' && (steps.resource_monitor_cache.outputs.cache-hit != 'true' || steps.transcript_scanner_cache.outputs.cache-hit != 'true')
         uses: taiki-e/install-action@cfdb7ed4ccc7c7dce37759eae89dc5674b469b39 # v2.90.3
         with:
           tool: cargo-xwin@0.23.1
+
+      - name: Ensure LLVM cross-compile tools for cargo-xwin
+        if: inputs.platform == 'win' && (steps.resource_monitor_cache.outputs.cache-hit != 'true' || steps.transcript_scanner_cache.outputs.cache-hit != 'true')
+        shell: bash
+        run: |
+          if ! command -v clang-cl >/dev/null 2>&1 || ! command -v llvm-lib >/dev/null 2>&1 || ! command -v lld-link >/dev/null 2>&1; then
+            sudo apt-get update && sudo apt-get install -y clang llvm lld
+          fi
 
       # Built here rather than inside the desktop build so the CLI archive,
       # which bundles the same binary, can be built and uploaded first.
@@ -284,6 +299,11 @@ jobs:
         if: steps.resource_monitor_cache.outputs.cache-hit != 'true'
         shell: bash
         run: cargo ${{ inputs.platform == 'win' && 'xwin build' || 'build' }} --locked --release --manifest-path native/resource-monitor/Cargo.toml --target "${{ inputs.rust_target }}"
+
+      - name: Build transcript scanner
+        if: steps.transcript_scanner_cache.outputs.cache-hit != 'true'
+        shell: bash
+        run: cargo ${{ inputs.platform == 'win' && 'xwin build' || 'build' }} --locked --release --manifest-path native/transcript-scanner/Cargo.toml --target "${{ inputs.rust_target }}"
 
       # Off Windows, scripts/lib/windows-jsign.ts signs through jsign instead of
       # the TrustedSigning PowerShell module.
@@ -417,18 +437,21 @@ jobs:
           echo "ZEROCODE_CLI_MAC_SIGN_IDENTITY=$identity" >> "$GITHUB_ENV"
           echo "macOS CLI signing enabled."
 
-      - name: Stage resource monitor for the CLI archive
+      - name: Stage native helpers for the CLI archive
         if: inputs.cli_archive
         shell: bash
         run: |
           set -euo pipefail
-          binary_name="zerocode-resource-monitor"
+          ext=""
           if [[ "${{ inputs.platform }}" == "win" ]]; then
-            binary_name="${binary_name}.exe"
+            ext=".exe"
           fi
-          target_dir="$RUNNER_TEMP/cli-resource-monitor/${{ inputs.resource_key }}"
-          mkdir -p "$target_dir"
-          cp "native/resource-monitor/target/${{ inputs.rust_target }}/release/${binary_name}" "$target_dir/$binary_name"
+          rm_dir="$RUNNER_TEMP/cli-resource-monitor/${{ inputs.resource_key }}"
+          mkdir -p "$rm_dir"
+          cp "native/resource-monitor/target/${{ inputs.rust_target }}/release/zerocode-resource-monitor${ext}" "$rm_dir/zerocode-resource-monitor${ext}"
+          ts_dir="$RUNNER_TEMP/cli-transcript-scanner/${{ inputs.resource_key }}"
+          mkdir -p "$ts_dir"
+          cp "native/transcript-scanner/target/${{ inputs.rust_target }}/release/zerocode-transcript-scanner${ext}" "$ts_dir/zerocode-transcript-scanner${ext}"
 
       # The Linux archive ships libatomic.so.1 and points zerocode's RUNPATH at it.
       - name: Install patchelf
@@ -476,6 +499,7 @@ jobs:
             --arch "${{ inputs.arch }}" \
             --version "${{ inputs.version }}" \
             --resource-monitor-dir "$RUNNER_TEMP/cli-resource-monitor" \
+            --transcript-scanner-dir "$RUNNER_TEMP/cli-transcript-scanner" \
             --output-dir release-cli \
             ${extra_args[@]+"${extra_args[@]}"}
 
@@ -580,6 +604,7 @@ jobs:
           pnpm_config_store_dir: ${{ steps.stage_pnpm.outputs.dir }}/store
           pnpm_config_prefer_offline: "true"
           ZEROCODE_DESKTOP_REUSE_RESOURCE_MONITOR: true
+          ZEROCODE_DESKTOP_REUSE_TRANSCRIPT_SCANNER: true
           ZEROCODE_DESKTOP_REUSE_LINUX_CAPTURE_HELPERS: ${{ steps.capture_helper_cache.outputs.cache-hit == 'true' }}
           ZEROCODE_DESKTOP_UNTRUSTED_BUNDLE: ${{ inputs.untrusted_bundle }}
           CSC_LINK: ${{ secrets.CSC_LINK }}

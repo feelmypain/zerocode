@@ -2418,10 +2418,14 @@ export const stageResourceMonitor = Effect.fn("stageResourceMonitor")(function* 
   ).pipe(Config.withDefault(false));
   const builtBinaries: string[] = [];
 
+  const hostPlatform = yield* HostProcess.Platform;
+  const cargoBuildArgs =
+    input.platform === "win" && hostPlatform !== "win32" ? ["xwin", "build"] : ["build"];
+
   for (const rustTarget of rustTargets) {
     if (!reuseResourceMonitor) {
       const spawnCommand = yield* resolveSpawnCommand("cargo", [
-        "build",
+        ...cargoBuildArgs,
         "--locked",
         "--release",
         "--manifest-path",
@@ -2501,10 +2505,14 @@ const stageTranscriptScanner = Effect.fn("stageTranscriptScanner")(function* (in
   ).pipe(Config.withDefault(false));
   const builtBinaries: string[] = [];
 
+  const hostPlatform = yield* HostProcess.Platform;
+  const cargoBuildArgs =
+    input.platform === "win" && hostPlatform !== "win32" ? ["xwin", "build"] : ["build"];
+
   for (const rustTarget of rustTargets) {
     if (!reuseTranscriptScanner) {
       const spawnCommand = yield* resolveSpawnCommand("cargo", [
-        "build",
+        ...cargoBuildArgs,
         "--locked",
         "--release",
         "--manifest-path",
