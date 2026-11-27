@@ -261,6 +261,8 @@ export function showBootError(error: unknown) {
   console.error("ZeroCode failed to start.", error);
   const bootShell = document.getElementById("boot-shell");
   if (!bootShell) return;
+  delete bootShell.dataset.state;
+  delete document.documentElement.dataset.appBooting;
 
   const bridge = window.desktopBridge;
   const environment = readEnvironment(bridge);

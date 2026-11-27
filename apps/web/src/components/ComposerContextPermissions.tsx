@@ -44,6 +44,7 @@ export function ComposerContextPermissions(props: {
   return (
     <Menu open={open} onOpenChange={setOpen}>
       <SharedTooltipTrigger
+        disabled={open}
         render={
           <MenuTrigger
             render={

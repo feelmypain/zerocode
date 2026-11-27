@@ -1,3 +1,5 @@
+import "~/index.css";
+
 import type { RuntimeMode } from "@zerocode/contracts";
 import { type ReactNode, useRef, useState } from "react";
 import { expect, it, vi } from "vite-plus/test";
@@ -215,4 +217,63 @@ it("opens permissions directly from the context strip and applies a supported mo
     .toHaveAttribute("aria-checked", "true");
   await userEvent.keyboard("{Escape}");
   await expect.element(trigger).toHaveFocus();
+});
+
+it("keeps a bottom-anchored permissions dropup stable in height and top-placed across long descriptions", async () => {
+  const longOptions = options.map((option) =>
+    option.mode === "auto"
+      ? {
+          ...option,
+          description:
+            "Les fournisseurs compatibles approuvent les actions courantes ; les autres demandent toujours.",
+        }
+      : option,
+  );
+  function BottomAnchoredPermissions() {
+    const [mode, setMode] = useState<RuntimeMode>("approval-required");
+    return (
+      <div
+        style={{
+          position: "fixed",
+          left: 0,
+          right: 0,
+          bottom: 16,
+          display: "flex",
+          justifyContent: "center",
+        }}
+      >
+        <ComposerFooterModeControls
+          runtimeMode={mode}
+          runtimeModeOptions={longOptions}
+          accessDisplay="label"
+          onRuntimeModeChange={setMode}
+        />
+      </div>
+    );
+  }
+
+  await using screen = await render(<BottomAnchoredPermissions />, { router: false });
+  await userEvent.click(screen.getByRole("button", { name: "Permissions: Supervised" }));
+
+  const popup = document.querySelector<HTMLElement>('[data-slot="menu-popup"]');
+  expect(popup).not.toBeNull();
+  expect(popup?.getAttribute("data-side")).toBe("top");
+  await Promise.all(popup!.getAnimations().map((animation) => animation.finished));
+  const initialRect = popup!.getBoundingClientRect();
+
+  await userEvent.hover(page.getByRole("menuitemradio", { name: "Auto", exact: true }));
+  const autoRect = popup!.getBoundingClientRect();
+  expect(Math.abs(autoRect.height - initialRect.height)).toBeLessThanOrEqual(0.5);
+  expect(Math.abs(autoRect.top - initialRect.top)).toBeLessThanOrEqual(0.5);
+
+  await userEvent.hover(page.getByRole("menuitemradio", { name: "Full access" }));
+  const fullAccessRect = popup!.getBoundingClientRect();
+  expect(Math.abs(fullAccessRect.height - initialRect.height)).toBeLessThanOrEqual(0.5);
+  expect(Math.abs(fullAccessRect.top - initialRect.top)).toBeLessThanOrEqual(0.5);
+
+  await userEvent.click(page.getByRole("menuitemradio", { name: "Full access" }));
+  await expect
+    .element(page.getByRole("menuitemradio", { name: "Full access" }))
+    .not.toBeInTheDocument();
+  await expect.element(screen.getByRole("button", { name: "Permissions: Full access" })).toBeVisible();
 });

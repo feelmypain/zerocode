@@ -10,6 +10,7 @@ import { isElectron } from "./env";
 import { startAppServices } from "./appInit";
 import { AppRoot } from "./AppRoot";
 import { whenLocaleReady } from "./i18n/runtime";
+import { revealBootedApp } from "./lib/bootSplash";
 import { chunkLoadState } from "./lib/chunkReloadGuard";
 
 const stopTrackingKeyboardLayout = trackKeyboardLayout();
@@ -46,6 +47,7 @@ export const startup = Promise.all([
         )}
       </React.StrictMode>,
     );
+    revealBootedApp();
   })
   .catch((error: unknown) => {
     if (chunkLoadState.reloadScheduled) return;

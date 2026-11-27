@@ -451,6 +451,7 @@ function OptionMenuRow(props: {
       </MenuTrigger>
       <MenuPopup
         ref={popupRef}
+        nested
         side="right"
         align="start"
         sideOffset={6}
@@ -708,7 +709,7 @@ function PermissionsMenu(props: {
         {current.label}
         <ChevronUpIcon aria-hidden="true" className="size-3" />
       </MenuTrigger>
-      <MenuPopup side="top" align="end" {...composerFloatingLayerProps}>
+      <MenuPopup nested side="top" align="end" {...composerFloatingLayerProps}>
         <ComposerPermissionsSection
           runtimeMode={props.runtimeMode}
           runtimeModeOptions={props.options}

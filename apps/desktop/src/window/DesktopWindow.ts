@@ -273,12 +273,19 @@ function buildConnectingSplashDataUrl(
 ): string {
   const background = getInitialWindowBackgroundColor(shouldUseDarkColors);
   const label = shouldUseDarkColors ? "#9ca3af" : "#6b7280";
-  const accent = shouldUseDarkColors ? "#f8fafc" : "#1f2937";
-  const track = shouldUseDarkColors ? "rgba(248,250,252,0.18)" : "rgba(31,41,55,0.18)";
+  const tileBg = shouldUseDarkColors ? "#18181b" : "#111827";
+  const tileBorder = shouldUseDarkColors ? "rgba(255,255,255,0.12)" : "rgba(0,0,0,0.08)";
+  const glow = shouldUseDarkColors ? "rgba(129,140,248,0.24)" : "rgba(79,70,229,0.16)";
   const message = progress
     ? `Upgrading database (${progress.current} of ${progress.total})`
     : "Connecting to WSL…";
-  const html = `<!doctype html><html><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'"><style>html,body{margin:0;height:100%}body{background:${background};color:${label};font-family:system-ui,-apple-system,'Segoe UI',sans-serif;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;-webkit-user-select:none;user-select:none;-webkit-app-region:drag}.spinner{width:26px;height:26px;border:3px solid ${track};border-top-color:${accent};border-radius:50%;animation:spin .8s linear infinite}.label{font-size:13px}@keyframes spin{to{transform:rotate(360deg)}}</style></head><body><div class="spinner"></div><div class="label">${message}</div></body></html>`;
+  const mark =
+    '<svg viewBox="0 0 64 64" width="60" height="60" aria-hidden="true"><rect x="2" y="2" width="60" height="60" rx="15" fill="' +
+    tileBg +
+    '" stroke="' +
+    tileBorder +
+    '" stroke-width="1.5"/><rect x="19" y="13" width="26" height="38" rx="13" fill="none" stroke="#ffffff" stroke-width="6.5"/><line x1="21" y1="45" x2="43" y2="19" stroke="#ffffff" stroke-width="5.5" stroke-linecap="round"/></svg>';
+  const html = `<!doctype html><html><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'"><style>html,body{margin:0;height:100%}body{background:${background};color:${label};font-family:system-ui,-apple-system,'Segoe UI',sans-serif;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;-webkit-user-select:none;user-select:none;-webkit-app-region:drag}.stage{position:relative;display:grid;place-items:center}.glow{position:absolute;inset:-28px;border-radius:9999px;background:radial-gradient(circle,${glow} 0%,transparent 70%);animation:in 480ms cubic-bezier(.16,1,.3,1) both}.mark{position:relative;border-radius:15px;box-shadow:0 16px 36px -14px rgba(0,0,0,.45);animation:in 420ms cubic-bezier(.16,1,.3,1) both}.label{font-size:12px;opacity:.8;animation:fade 380ms ease-out 120ms both}@keyframes in{from{opacity:0;transform:scale(.86) translateY(6px)}to{opacity:1;transform:none}}@keyframes fade{from{opacity:0}to{opacity:.8}}@media (prefers-reduced-motion:reduce){.glow,.mark,.label{animation:none}}</style></head><body><div class="stage"><div class="glow"></div><div class="mark">${mark}</div></div><div class="label">${message}</div></body></html>`;
   return `data:text/html;charset=utf-8,${encodeURIComponent(html)}`;
 }
 

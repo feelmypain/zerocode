@@ -29,6 +29,7 @@ function MenuPopup({
   anchor,
   keepMounted = false,
   width = "default",
+  nested = false,
   ...props
 }: MenuPrimitive.Popup.Props & {
   align?: MenuPrimitive.Positioner.Props["align"];
@@ -39,6 +40,8 @@ function MenuPopup({
   anchor?: MenuPrimitive.Positioner.Props["anchor"];
   keepMounted?: boolean;
   width?: "default" | "content";
+  /** Renders above parent popovers/menus without stacking a second backdrop-filter blur. */
+  nested?: boolean;
 }) {
   return (
     <MenuPrimitive.Portal keepMounted={keepMounted}>
@@ -47,7 +50,7 @@ function MenuPopup({
         alignOffset={alignOffset}
         anchor={anchor}
         collisionAvoidance={collisionAvoidance}
-        className="z-[130]"
+        className={nested ? "z-[135]" : "z-[130]"}
         data-slot="menu-positioner"
         render={renderClosingPositioner}
         side={side}
@@ -55,7 +58,10 @@ function MenuPopup({
       >
         <MenuPrimitive.Popup
           className={cn(
-            "dropdown-glass relative flex origin-(--transform-origin) rounded-lg shadow-[0_16px_40px_-18px_rgb(0_0_0/55%)] outline-none focus:outline-none dark:shadow-[0_18px_44px_-18px_rgb(0_0_0/80%)]",
+            nested ? "border border-border/80 bg-popover" : "dropdown-glass",
+            "isolate relative flex origin-(--transform-origin) rounded-lg shadow-[0_16px_40px_-18px_rgb(0_0_0/55%)] outline-none transition-[scale,opacity] duration-120 ease-out focus:outline-none data-starting-style:scale-98 data-starting-style:opacity-0 data-ending-style:scale-98 data-ending-style:opacity-0 data-instant:duration-0 motion-reduce:transition-none dark:shadow-[0_18px_44px_-18px_rgb(0_0_0/80%)]",
+            // Without it, Chromium re-snaps text after scale-in at fractional Linux/Wayland zoom.
+            "will-change-[scale]",
             // Electron drag hit-testing ignores z-index; opt portaled menus out to keep overlapping rows
             // hoverable.
             "[-webkit-app-region:no-drag]",
@@ -373,6 +379,7 @@ function MenuSubPopup({
       alignOffset={alignOffset ?? defaultAlignOffset}
       className={className}
       data-slot="menu-sub-content"
+      nested
       side="inline-end"
       sideOffset={sideOffset}
       {...props}

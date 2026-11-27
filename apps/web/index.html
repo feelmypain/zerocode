@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" data-app-booting="true">
   <head>
     <meta charset="UTF-8" />
     <meta
@@ -9,6 +9,7 @@
     <meta name="theme-color" content="#000000" />
     <link rel="icon" href="/favicon.ico" sizes="48x48" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <link rel="preload" as="image" href="/apple-touch-icon.png" />
     <link rel="manifest" href="/manifest.webmanifest" />
     <script>
       (() => {
@@ -414,14 +415,23 @@
       }
 
       #boot-shell {
-        position: relative;
+        position: fixed;
+        inset: 0;
+        z-index: 2147483647;
         overflow: hidden;
         display: flex;
-        min-height: 100%;
         align-items: center;
         justify-content: center;
-        background: inherit;
-        color: inherit;
+        background: #ffffff;
+        color: #262626;
+        -webkit-app-region: drag;
+        opacity: 1;
+        transition: opacity 380ms cubic-bezier(0.22, 1, 0.36, 1);
+      }
+
+      html.dark #boot-shell {
+        background: #000000;
+        color: #f5f5f5;
       }
 
       html[data-theme-selected="true"] #boot-shell {
@@ -435,19 +445,110 @@
         display: flex;
         align-items: center;
         justify-content: center;
-        width: 96px;
-        height: 96px;
+        width: 112px;
+        height: 112px;
+        transition:
+          opacity 320ms cubic-bezier(0.22, 1, 0.36, 1),
+          transform 380ms cubic-bezier(0.22, 1, 0.36, 1),
+          filter 340ms cubic-bezier(0.22, 1, 0.36, 1);
+      }
+
+      #boot-shell-glow {
+        position: absolute;
+        inset: -40px;
+        border-radius: 9999px;
+        pointer-events: none;
+        background: radial-gradient(
+          circle,
+          color-mix(in srgb, var(--boot-accent, #4f46e5) 18%, transparent) 0%,
+          transparent 68%
+        );
+        opacity: 0;
+        transform: scale(0.76);
+      }
+
+      html.dark #boot-shell-glow {
+        background: radial-gradient(
+          circle,
+          color-mix(in srgb, var(--boot-accent, #818cf8) 26%, transparent) 0%,
+          transparent 68%
+        );
       }
 
       #boot-shell-logo {
-        width: 64px;
-        height: 64px;
+        position: relative;
+        width: 76px;
+        height: 76px;
+        border-radius: 18px;
         object-fit: contain;
+        box-shadow:
+          0 18px 42px -16px rgb(0 0 0 / 0.45),
+          0 0 0 1px color-mix(in srgb, currentColor 10%, transparent);
+        opacity: 0;
+        transform: scale(0.84) translateY(8px);
+      }
+
+      #boot-shell[data-visible="true"] #boot-shell-glow {
+        animation: boot-glow-in 520ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+      }
+
+      #boot-shell[data-visible="true"] #boot-shell-logo {
+        animation: boot-logo-in 440ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+      }
+
+      #boot-shell[data-state="leaving"] {
+        opacity: 0;
+        pointer-events: none;
+      }
+
+      #boot-shell[data-state="leaving"] #boot-shell-card {
+        opacity: 0;
+        transform: scale(1.06);
+        filter: blur(4px);
+      }
+
+      html[data-app-booting="true"] #root {
+        opacity: 0;
+        transform: scale(0.988);
+        filter: blur(4px);
+        pointer-events: none;
+      }
+
+      html[data-app-booting="revealing"] #root {
+        opacity: 1;
+        transform: scale(1);
+        filter: blur(0);
+        transition:
+          opacity 420ms cubic-bezier(0.22, 1, 0.36, 1) 40ms,
+          transform 460ms cubic-bezier(0.16, 1, 0.3, 1) 40ms,
+          filter 400ms cubic-bezier(0.22, 1, 0.36, 1) 40ms;
+      }
+
+      @keyframes boot-logo-in {
+        from {
+          opacity: 0;
+          transform: scale(0.84) translateY(8px);
+        }
+        to {
+          opacity: 1;
+          transform: scale(1) translateY(0);
+        }
+      }
+
+      @keyframes boot-glow-in {
+        from {
+          opacity: 0;
+          transform: scale(0.76);
+        }
+        to {
+          opacity: 1;
+          transform: scale(1);
+        }
       }
 
       #boot-shell-progress {
         position: absolute;
-        top: 100%;
+        top: calc(100% + 4px);
         width: min(360px, 80vw);
         text-align: center;
         font: 13px system-ui;
@@ -457,8 +558,36 @@
       /* App CSS locks body and #root scrolling once main loads, so the error screen scrolls itself. */
       #boot-shell:has(> #boot-error) {
         height: 100%;
+        align-items: flex-start;
         overflow-x: hidden;
         overflow-y: auto;
+        opacity: 1;
+        pointer-events: auto;
+        -webkit-app-region: no-drag;
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        #boot-shell,
+        #boot-shell-card,
+        html[data-app-booting="revealing"] #root {
+          transition: none;
+        }
+
+        #boot-shell-glow,
+        #boot-shell-logo,
+        #boot-shell[data-visible="true"] #boot-shell-glow,
+        #boot-shell[data-visible="true"] #boot-shell-logo {
+          animation: none;
+          opacity: 1;
+          transform: none;
+          filter: none;
+        }
+
+        html[data-app-booting="true"] #root {
+          opacity: 0;
+          transform: none;
+          filter: none;
+        }
       }
 
       #boot-error {
@@ -693,32 +822,63 @@
     <title>ZeroCode</title>
   </head>
   <body>
-    <div id="root">
-      <div id="boot-shell">
-        <div id="boot-shell-card" aria-label="ZeroCode splash screen">
-          <img id="boot-shell-logo" src="/apple-touch-icon.png" alt="ZeroCode" />
-          <p id="boot-shell-progress" role="status" aria-live="polite"></p>
-        </div>
+    <div id="root"></div>
+    <div id="boot-shell">
+      <div id="boot-shell-card" aria-label="ZeroCode splash screen">
+        <div id="boot-shell-glow" aria-hidden="true"></div>
+        <img
+          id="boot-shell-logo"
+          src="/apple-touch-icon.png"
+          alt="ZeroCode"
+          width="76"
+          height="76"
+          decoding="sync"
+        />
+        <p id="boot-shell-progress" role="status" aria-live="polite"></p>
       </div>
     </div>
     <script>
-      const migrationLabel = document.getElementById("boot-shell-progress");
-      const readMigrationProgress = window.desktopBridge?.getDatabaseMigrationProgress;
-      if (readMigrationProgress && migrationLabel) {
-        const updateMigrationProgress = async () => {
-          if (!migrationLabel.isConnected) return;
-          try {
-            const progress = await readMigrationProgress();
-            migrationLabel.textContent = progress
-              ? `Upgrading database (${progress.current} of ${progress.total})`
-              : "";
-          } catch {
-            migrationLabel.textContent = "";
-          }
-          if (migrationLabel.isConnected) setTimeout(updateMigrationProgress, 1000);
+      (() => {
+        const bootShell = document.getElementById("boot-shell");
+        const activateBootSplash = () => {
+          if (!bootShell || bootShell.dataset.visible === "true") return;
+          bootShell.dataset.visible = "true";
+          window.__ZEROCODE_BOOT_START__ = performance.now();
         };
-        void updateMigrationProgress();
-      }
+        if (!document.hidden) {
+          activateBootSplash();
+        } else {
+          const onVisible = () => {
+            if (document.hidden) return;
+            document.removeEventListener("visibilitychange", onVisible);
+            activateBootSplash();
+          };
+          document.addEventListener("visibilitychange", onVisible);
+          // Minimized or headless launches still proceed if visibilitychange never fires.
+          setTimeout(() => {
+            document.removeEventListener("visibilitychange", onVisible);
+            activateBootSplash();
+          }, 250);
+        }
+
+        const migrationLabel = document.getElementById("boot-shell-progress");
+        const readMigrationProgress = window.desktopBridge?.getDatabaseMigrationProgress;
+        if (readMigrationProgress && migrationLabel) {
+          const updateMigrationProgress = async () => {
+            if (!migrationLabel.isConnected) return;
+            try {
+              const progress = await readMigrationProgress();
+              migrationLabel.textContent = progress
+                ? `Upgrading database (${progress.current} of ${progress.total})`
+                : "";
+            } catch {
+              migrationLabel.textContent = "";
+            }
+            if (migrationLabel.isConnected) setTimeout(updateMigrationProgress, 1000);
+          };
+          void updateMigrationProgress();
+        }
+      })();
     </script>
     <script type="module" src="/src/bootstrap.ts"></script>
   </body>

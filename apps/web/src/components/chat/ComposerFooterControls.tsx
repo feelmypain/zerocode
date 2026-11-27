@@ -53,7 +53,7 @@ export const ComposerFooterModeControls = memo(function ComposerFooterModeContro
         focusRequestedPermission(isOpen, permissionsChipRef.current)
       }
     >
-      <Tooltip>
+      <Tooltip disabled={open}>
         <TooltipTrigger
           render={
             <MenuTrigger
@@ -85,7 +85,7 @@ export const ComposerFooterModeControls = memo(function ComposerFooterModeContro
         </TooltipTrigger>
         <TooltipPopup side="top">{permissionsTooltip}</TooltipPopup>
       </Tooltip>
-      <MenuPopup align="start" {...composerFloatingLayerProps}>
+      <MenuPopup side="top" align="start" {...composerFloatingLayerProps}>
         <ComposerPermissionsSection
           runtimeMode={props.runtimeMode}
           runtimeModeOptions={props.runtimeModeOptions}
@@ -127,7 +127,14 @@ export function ComposerPermissionsSection(props: {
         aria-label={gt("Permissions")}
         value={props.runtimeMode}
         onValueChange={(value: RuntimeMode) => {
+          setPreviewMode(value);
           if (value !== props.runtimeMode) props.onRuntimeModeChange(value);
+        }}
+        onPointerLeave={() => setPreviewMode(null)}
+        onBlur={(event) => {
+          if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
+            setPreviewMode(null);
+          }
         }}
         className="flex rounded-lg bg-input/40 p-0.5"
         // Menus navigate with Up/Down only; the row reads horizontally, so Left/Right move too.
@@ -156,9 +163,7 @@ export function ComposerPermissionsSection(props: {
               aria-describedby={`${descriptionId}-${option.mode}`}
               closeOnClick
               onPointerEnter={() => setPreviewMode(option.mode)}
-              onPointerLeave={() => setPreviewMode(null)}
               onFocus={() => setPreviewMode(option.mode)}
-              onBlur={() => setPreviewMode(null)}
               className="flex h-6 flex-1 cursor-pointer items-center justify-center text-muted-foreground outline-none first:rounded-l-md last:rounded-r-md data-disabled:cursor-not-allowed data-disabled:opacity-40 data-checked:bg-input/72 data-checked:text-foreground data-highlighted:text-foreground not-data-checked:data-highlighted:bg-accent focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"
             >
               <OptionIcon aria-hidden="true" className="size-3.5" />
@@ -173,19 +178,39 @@ export function ComposerPermissionsSection(props: {
         </span>
       ))}
       <div className="grid gap-0.5" aria-hidden="true">
-        <span
-          className={
-            shownMode === props.runtimeMode
-              ? "text-foreground text-sm"
-              : "text-muted-foreground text-sm"
-          }
-        >
-          {shown.label}
-        </span>
-        {/* Two lines reserved so the menu does not shift while you preview modes. */}
-        <span className="min-h-8 text-muted-foreground text-xs leading-4">
-          {shown.disabledReason ?? shown.description}
-        </span>
+        <div className="grid">
+          {props.runtimeModeOptions.map((option) => (
+            <span
+              key={option.mode}
+              className="invisible col-start-1 row-start-1 select-none text-sm"
+            >
+              {option.label}
+            </span>
+          ))}
+          <span
+            className={
+              shownMode === props.runtimeMode
+                ? "col-start-1 row-start-1 text-foreground text-sm"
+                : "col-start-1 row-start-1 text-muted-foreground text-sm"
+            }
+          >
+            {shown.label}
+          </span>
+        </div>
+        {/* Reserve the tallest option height so hovering never shifts a top-anchored menu. */}
+        <div className="grid">
+          {props.runtimeModeOptions.map((option) => (
+            <span
+              key={option.mode}
+              className="invisible col-start-1 row-start-1 select-none text-xs leading-4"
+            >
+              {option.disabledReason ?? option.description}
+            </span>
+          ))}
+          <span className="col-start-1 row-start-1 text-muted-foreground text-xs leading-4">
+            {shown.disabledReason ?? shown.description}
+          </span>
+        </div>
       </div>
     </div>
   );
