@@ -35,8 +35,8 @@ const TRANSCRIPT_BYTE_CAP = 256 * 1024;
 const BATCH_TRANSCRIPT_BYTES = 512 * 1024;
 const STEP_TEXT_CAP = 4_000;
 const TOOL_INPUT_CAP = 1_000;
-const MAX_MESSAGE_FILES = 256;
-const MAX_DETACHED_CHILDREN = 64;
+const MAX_MESSAGE_FILES = 1024;
+const MAX_DETACHED_CHILDREN = 512;
 
 /** ZeroCode's title for a batch whose launch text it never saw. */
 export const ANTIGRAVITY_SUBAGENT_BATCH_TITLE = "Antigravity subagent batch";
@@ -659,11 +659,22 @@ const decodeSwarmRoster = Schema.decodeUnknownOption(
   ),
 );
 
+export type AntigravityDetachedSubagentSettledStatus =
+  | "idle"
+  | "completed"
+  | "failed"
+  | "cancelled";
+
+export interface AntigravityDetachedSubagentStatuses {
+  readonly running: ReadonlyArray<string>;
+  readonly settled: ReadonlyMap<string, AntigravityDetachedSubagentSettledStatus>;
+}
+
 interface DiskSwarmMember {
   readonly name: string;
   readonly role: string;
-  readonly killed: boolean;
-  readonly parked: boolean;
+  readonly settled: AntigravityDetachedSubagentSettledStatus | null;
+  readonly working: boolean;
 }
 
 async function readDiskSwarmMembersByConversationId(
@@ -689,15 +700,28 @@ async function readDiskSwarmMembersByConversationId(
     if (role === "coordinator") continue;
     const phase = member.phase?.trim().toUpperCase();
     const desiredState = member.desired_state?.trim().toUpperCase();
-    const killed = desiredState === "KILLED" || phase === "KILLED";
-    const parked =
-      member.wake_mode === "mentions" ||
-      member.wake_mode === "anything" ||
-      desiredState === "STOPPED" ||
-      phase === "WAITING" ||
-      phase === "IDLE" ||
-      phase === "STOPPED";
-    byConversation.set(convId, { name, role, killed, parked });
+    const wakeMode = member.wake_mode?.trim().toLowerCase();
+    const settled: AntigravityDetachedSubagentSettledStatus | null =
+      desiredState === "KILLED" ||
+      phase === "KILLED" ||
+      phase === "CANCELLED" ||
+      phase === "INTERRUPTED"
+        ? "cancelled"
+        : phase === "FAILED" || phase === "ERROR"
+          ? "failed"
+          : phase === "DONE" || phase === "COMPLETED" || phase === "FINISHED"
+            ? "completed"
+            : wakeMode === "mentions" ||
+                wakeMode === "anything" ||
+                desiredState === "STOPPED" ||
+                phase === "WAITING" ||
+                phase === "IDLE" ||
+                phase === "STOPPED"
+              ? "idle"
+              : null;
+    const working =
+      settled === null && (wakeMode === "working" || phase === "WORKING" || phase === "RUNNING");
+    byConversation.set(convId, { name, role, settled, working });
   }
   return byConversation;
 }
@@ -918,24 +942,173 @@ export const readAntigravityPendingReply = Effect.fn("readAntigravityPendingRepl
   },
 );
 
-const TERMINAL_PLANNER_STATUSES = new Set(["DONE", "ERROR", "CANCELLED"]);
+const TERMINAL_DONE_PLANNER_STATUSES = new Set(["DONE", "COMPLETED"]);
+const TERMINAL_FAILED_PLANNER_STATUSES = new Set(["ERROR", "FAILED"]);
+const TERMINAL_CANCELLED_PLANNER_STATUSES = new Set(["CANCELLED", "INTERRUPTED", "STOPPED"]);
 
-async function isDetachedChildTranscriptIdle(
+async function detachedChildTranscriptOutcome(
   profileRoot: string,
   childId: string,
-): Promise<boolean> {
+): Promise<AntigravityDetachedSubagentSettledStatus | undefined> {
   const lastStep = await readLastTranscriptLine(profileRoot, childId);
   if (
     lastStep === undefined ||
     lastStep.type !== "PLANNER_RESPONSE" ||
     lastStep.status === undefined ||
-    !TERMINAL_PLANNER_STATUSES.has(lastStep.status.toUpperCase()) ||
     (lastStep.tool_calls !== undefined && lastStep.tool_calls.length > 0)
   ) {
-    return false;
+    return undefined;
   }
-  return !(await hasUnreadWakingInboxMessage(profileRoot, childId));
+  const status = lastStep.status.toUpperCase();
+  const settled: AntigravityDetachedSubagentSettledStatus | undefined =
+    TERMINAL_FAILED_PLANNER_STATUSES.has(status)
+      ? "failed"
+      : TERMINAL_CANCELLED_PLANNER_STATUSES.has(status)
+        ? "cancelled"
+        : TERMINAL_DONE_PLANNER_STATUSES.has(status)
+          ? "idle"
+          : undefined;
+  if (settled === undefined) return undefined;
+  return (await hasUnreadWakingInboxMessage(profileRoot, childId)) ? undefined : settled;
 }
+
+function detachedSubagentStateOutcome(
+  state: string | undefined,
+): AntigravityDetachedSubagentSettledStatus | undefined {
+  if (state === undefined) return undefined;
+  const normalized = state.trim().toUpperCase();
+  if (normalized === "SUBAGENT_STATE_ALIVE" || normalized === "SUBAGENT_STATE_RUNNING") {
+    return undefined;
+  }
+  if (
+    normalized === "SUBAGENT_STATE_KILLED" ||
+    normalized === "SUBAGENT_STATE_CANCELLED" ||
+    normalized === "SUBAGENT_STATE_INTERRUPTED" ||
+    normalized === "SUBAGENT_STATE_STOPPED"
+  ) {
+    return "cancelled";
+  }
+  if (normalized === "SUBAGENT_STATE_FAILED" || normalized === "SUBAGENT_STATE_ERROR") {
+    return "failed";
+  }
+  if (
+    normalized === "SUBAGENT_STATE_COMPLETED" ||
+    normalized === "SUBAGENT_STATE_DONE" ||
+    normalized === "SUBAGENT_STATE_FINISHED"
+  ) {
+    return "completed";
+  }
+  return "idle";
+}
+
+const SETTLED_STATUS_RANK: Readonly<Record<AntigravityDetachedSubagentSettledStatus, number>> = {
+  completed: 0,
+  idle: 1,
+  cancelled: 2,
+  failed: 3,
+};
+
+function mergeSettledStatus(
+  left: AntigravityDetachedSubagentSettledStatus,
+  right: AntigravityDetachedSubagentSettledStatus,
+): AntigravityDetachedSubagentSettledStatus {
+  return SETTLED_STATUS_RANK[right] > SETTLED_STATUS_RANK[left] ? right : left;
+}
+
+const EMPTY_DETACHED_STATUSES: AntigravityDetachedSubagentStatuses = {
+  running: [],
+  settled: new Map(),
+};
+
+/**
+ * Inspects detached agy 1.5 children on disk for `toolCallIds`, separating tasks still working
+ * from tasks positively observed as settled. Unseen task ids appear in neither collection so
+ * mid-turn polling does not prematurely settle a newly launched child before disk flush.
+ */
+export const readAntigravityDetachedSubagentStatuses = Effect.fn(
+  "readAntigravityDetachedSubagentStatuses",
+)(function* (input: {
+  readonly profileDirectory: string;
+  readonly rootSessionId: string;
+  readonly toolCallIds: ReadonlyArray<string>;
+}) {
+  if (!NATIVE_ID.test(input.rootSessionId) || input.toolCallIds.length === 0) {
+    return EMPTY_DETACHED_STATUSES;
+  }
+  const wanted = new Set(input.toolCallIds);
+  const read = async (): Promise<AntigravityDetachedSubagentStatuses> => {
+    const profileRoot = await antigravityProfileRoot(input.profileDirectory);
+    const childIds =
+      profileRoot === undefined
+        ? undefined
+        : await listDetachedChildIds(profileRoot, input.rootSessionId);
+    if (profileRoot === undefined || childIds === undefined) return EMPTY_DETACHED_STATUSES;
+    const reported = new Set(
+      (await readInbox(profileRoot, input.rootSessionId).catch(() => [])).map(
+        (message) => message.sender,
+      ),
+    );
+    const swarmMembers = await readDiskSwarmMembersByConversationId(
+      profileRoot,
+      input.rootSessionId,
+    );
+    const atWork = new Set<string>();
+    const settled = new Map<string, AntigravityDetachedSubagentSettledStatus>();
+    for (const childId of childIds) {
+      const matchedTaskIds: Array<string> = [];
+      const directTaskId = `swarm:${childId}`;
+      if (wanted.has(directTaskId)) {
+        matchedTaskIds.push(directTaskId);
+      }
+      const childMessages = await readInbox(profileRoot, childId).catch(() => []);
+      for (const message of childMessages) {
+        const launch = detachedLaunchCall(message, input.rootSessionId);
+        if (launch !== undefined && wanted.has(launch.id) && !matchedTaskIds.includes(launch.id)) {
+          matchedTaskIds.push(launch.id);
+        }
+      }
+      if (matchedTaskIds.length === 0) continue;
+
+      const swarmMember = swarmMembers.get(childId);
+      let outcome: AntigravityDetachedSubagentSettledStatus | undefined =
+        swarmMember?.settled ?? undefined;
+      if (outcome === undefined) {
+        // `manage_subagents` kill only marks the record; a killed child never reports.
+        const subagent = await readDetachedSubagent(profileRoot, input.rootSessionId, childId);
+        outcome = detachedSubagentStateOutcome(subagent?.state);
+      }
+      if (outcome === undefined && reported.has(childId)) {
+        if (!(await hasUnreadWakingInboxMessage(profileRoot, childId))) {
+          const transcriptOutcome = await detachedChildTranscriptOutcome(profileRoot, childId);
+          outcome =
+            transcriptOutcome === "failed" || transcriptOutcome === "cancelled"
+              ? transcriptOutcome
+              : "idle";
+        }
+      } else if (outcome === undefined && swarmMember?.working !== true) {
+        outcome = await detachedChildTranscriptOutcome(profileRoot, childId);
+      }
+
+      for (const taskId of matchedTaskIds) {
+        if (outcome === undefined) {
+          atWork.add(taskId);
+          settled.delete(taskId);
+        } else if (!atWork.has(taskId)) {
+          const previous = settled.get(taskId);
+          settled.set(
+            taskId,
+            previous === undefined ? outcome : mergeSettledStatus(previous, outcome),
+          );
+        }
+      }
+    }
+    return { running: [...atWork], settled };
+  };
+  return yield* Effect.tryPromise({
+    try: read,
+    catch: (cause) => new AntigravityChildWorkReadError({ cause }),
+  }).pipe(Effect.orElseSucceed(() => EMPTY_DETACHED_STATUSES));
+});
 
 /**
  * agy 1.5 children outlive their `invoke_subagent` call and the agent reports no end for them:
@@ -949,58 +1122,6 @@ export const readAntigravityChildrenAtWork = Effect.fn("readAntigravityChildrenA
     readonly rootSessionId: string;
     readonly toolCallIds: ReadonlyArray<string>;
   }) {
-    if (!NATIVE_ID.test(input.rootSessionId)) return [];
-    const read = async (): Promise<ReadonlyArray<string>> => {
-      const profileRoot = await antigravityProfileRoot(input.profileDirectory);
-      const childIds =
-        profileRoot === undefined
-          ? undefined
-          : await listDetachedChildIds(profileRoot, input.rootSessionId);
-      if (profileRoot === undefined || childIds === undefined) return [];
-      const reported = new Set(
-        (await readInbox(profileRoot, input.rootSessionId)).map((message) => message.sender),
-      );
-      const swarmMembers = await readDiskSwarmMembersByConversationId(
-        profileRoot,
-        input.rootSessionId,
-      );
-      const atWork = new Set<string>();
-      for (const childId of childIds) {
-        if (reported.has(childId)) continue;
-        const swarmMember = swarmMembers.get(childId);
-        if (swarmMember?.killed === true || swarmMember?.parked === true) continue;
-        // `manage_subagents` kill only marks the record; a killed child never reports.
-        const subagent = await readDetachedSubagent(profileRoot, input.rootSessionId, childId);
-        const subagentState = subagent?.state?.trim().toUpperCase();
-        if (
-          subagentState !== undefined &&
-          subagentState !== "SUBAGENT_STATE_ALIVE" &&
-          subagentState !== "SUBAGENT_STATE_RUNNING"
-        ) {
-          continue;
-        }
-        if (
-          swarmMember === undefined &&
-          (await isDetachedChildTranscriptIdle(profileRoot, childId))
-        ) {
-          continue;
-        }
-        const directTaskId = `swarm:${childId}`;
-        if (input.toolCallIds.includes(directTaskId)) {
-          atWork.add(directTaskId);
-        }
-        for (const message of await readInbox(profileRoot, childId)) {
-          const launch = detachedLaunchCall(message, input.rootSessionId);
-          if (launch !== undefined && input.toolCallIds.includes(launch.id)) {
-            atWork.add(launch.id);
-          }
-        }
-      }
-      return [...atWork];
-    };
-    return yield* Effect.tryPromise({
-      try: read,
-      catch: (cause) => new AntigravityChildWorkReadError({ cause }),
-    }).pipe(Effect.orElseSucceed((): ReadonlyArray<string> => []));
+    return (yield* readAntigravityDetachedSubagentStatuses(input)).running;
   },
 );

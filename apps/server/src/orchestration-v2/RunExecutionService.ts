@@ -70,6 +70,9 @@ export interface ProviderEventRoutingState {
   readonly ownedProviderThreadIds: ReadonlySet<ProviderThreadId>;
   readonly ownedProviderTurns: ReadonlyMap<ProviderTurnId, ProviderThreadId>;
   readonly inheritedBackgroundTurnItems: ReadonlyMap<TurnItemId, OrchestrationV2Run["id"]>;
+  readonly inheritedBackgroundSubagents: ReadonlyMap<NodeId, OrchestrationV2Run["id"]>;
+  readonly inheritedBackgroundNodes: ReadonlyMap<NodeId, OrchestrationV2Run["id"]>;
+  readonly inheritedBackgroundChildThreads: ReadonlySet<ThreadId>;
   readonly rootProviderTurnId: ProviderTurnId | null;
 }
 
@@ -83,6 +86,9 @@ export interface ProviderEventRouteIdentity {
 export interface InheritedBackgroundTurnItemRoute {
   readonly id: TurnItemId;
   readonly runId: OrchestrationV2Run["id"];
+  readonly subagentId?: NodeId;
+  readonly nodeId?: NodeId | null;
+  readonly childThreadId?: ThreadId | null;
 }
 
 type ProviderTerminalEvent = Extract<
@@ -135,16 +141,32 @@ export function selectInheritedBackgroundTurnItems(input: {
       )
       .map((run) => run.id),
   );
-  return input.turnItems.flatMap((turnItem) =>
-    turnItem.threadId === input.threadId &&
-    turnItem.providerThreadId === input.currentProviderThreadId &&
-    turnItem.runId !== null &&
-    settledPriorRunIds.has(turnItem.runId) &&
-    backgroundCapableTurnItemTypes.has(turnItem.type) &&
-    !isSettledTurnItemStatus(turnItem.status)
-      ? [{ id: turnItem.id, runId: turnItem.runId }]
-      : [],
-  );
+  return input.turnItems.flatMap((turnItem) => {
+    if (
+      turnItem.threadId !== input.threadId ||
+      turnItem.providerThreadId !== input.currentProviderThreadId ||
+      turnItem.runId === null ||
+      !settledPriorRunIds.has(turnItem.runId) ||
+      !backgroundCapableTurnItemTypes.has(turnItem.type) ||
+      isSettledTurnItemStatus(turnItem.status)
+    ) {
+      return [];
+    }
+    if (turnItem.type === "subagent") {
+      return [
+        {
+          id: turnItem.id,
+          runId: turnItem.runId,
+          ...(turnItem.subagentId === undefined ? {} : { subagentId: turnItem.subagentId }),
+          ...(turnItem.nodeId === undefined ? {} : { nodeId: turnItem.nodeId }),
+          ...(turnItem.childThreadId === undefined
+            ? {}
+            : { childThreadId: turnItem.childThreadId }),
+        },
+      ];
+    }
+    return [{ id: turnItem.id, runId: turnItem.runId }];
+  });
 }
 
 type SubagentTurnItem = Extract<OrchestrationV2TurnItem, { readonly type: "subagent" }>;
@@ -381,6 +403,23 @@ export function makeProviderEventRoutingState(input: {
   readonly relatedThreadIds?: ReadonlyArray<ThreadId>;
   readonly relatedProviderThreadIds?: ReadonlyArray<ProviderThreadId>;
 }): ProviderEventRoutingState {
+  const inheritedBackgroundTurnItems = new Map<TurnItemId, OrchestrationV2Run["id"]>();
+  const inheritedBackgroundSubagents = new Map<NodeId, OrchestrationV2Run["id"]>();
+  const inheritedBackgroundNodes = new Map<NodeId, OrchestrationV2Run["id"]>();
+  const inheritedBackgroundChildThreads = new Set<ThreadId>();
+  for (const item of input.inheritedBackgroundTurnItems ?? []) {
+    inheritedBackgroundTurnItems.set(item.id, item.runId);
+    if (item.subagentId !== undefined) {
+      inheritedBackgroundSubagents.set(item.subagentId, item.runId);
+      inheritedBackgroundNodes.set(item.subagentId, item.runId);
+    }
+    if (item.nodeId != null) {
+      inheritedBackgroundNodes.set(item.nodeId, item.runId);
+    }
+    if (item.childThreadId != null) {
+      inheritedBackgroundChildThreads.add(item.childThreadId);
+    }
+  }
   return {
     ownedThreadIds: new Set([input.identity.threadId, ...(input.relatedThreadIds ?? [])]),
     rootTurnEnded: false,
@@ -393,9 +432,10 @@ export function makeProviderEventRoutingState(input: {
       input.providerTurnId === null
         ? new Map()
         : new Map([[input.providerTurnId, input.identity.providerThreadId]]),
-    inheritedBackgroundTurnItems: new Map(
-      (input.inheritedBackgroundTurnItems ?? []).map((item) => [item.id, item.runId]),
-    ),
+    inheritedBackgroundTurnItems,
+    inheritedBackgroundSubagents,
+    inheritedBackgroundNodes,
+    inheritedBackgroundChildThreads,
     rootProviderTurnId: input.providerTurnId,
   };
 }
@@ -476,17 +516,56 @@ export function routeProviderEvent(
         : [false, state];
     }
     case "node.updated": {
-      const belongs =
+      if (
         ownsRun(event.node.runId) ||
         ownsChildThread(event.node.threadId) ||
         ((event.node.kind === "todo_list" || event.node.kind === "plan") &&
-          adoptsEarlierPlan(event.node.threadId));
-      if (!belongs || event.node.providerThreadId === null) {
-        return [belongs, state];
+          adoptsEarlierPlan(event.node.threadId))
+      ) {
+        return event.node.providerThreadId === null
+          ? [true, state]
+          : [true, addProviderThread(event.node.providerThreadId)];
       }
-      return [true, addProviderThread(event.node.providerThreadId)];
+      const inheritedNodeRunId = state.inheritedBackgroundNodes.get(event.node.id);
+      if (
+        event.node.threadId === input.threadId &&
+        event.node.runId !== null &&
+        event.node.runId === inheritedNodeRunId
+      ) {
+        if (isOpenExecutionNodeStatus(event.node.status)) {
+          return [true, state];
+        }
+        const inheritedBackgroundNodes = new Map(state.inheritedBackgroundNodes);
+        inheritedBackgroundNodes.delete(event.node.id);
+        return [true, { ...state, inheritedBackgroundNodes }];
+      }
+      if (
+        event.node.runId === null &&
+        state.inheritedBackgroundChildThreads.has(event.node.threadId)
+      ) {
+        if (event.node.kind !== "root_turn" || isOpenExecutionNodeStatus(event.node.status)) {
+          return [true, state];
+        }
+        const inheritedBackgroundChildThreads = new Set(state.inheritedBackgroundChildThreads);
+        inheritedBackgroundChildThreads.delete(event.node.threadId);
+        return [true, { ...state, inheritedBackgroundChildThreads }];
+      }
+      return [false, state];
     }
     case "subagent.updated": {
+      const inheritedSubagentRunId = state.inheritedBackgroundSubagents.get(event.subagent.id);
+      if (
+        event.subagent.threadId === input.threadId &&
+        event.subagent.runId !== null &&
+        event.subagent.runId === inheritedSubagentRunId
+      ) {
+        if (!isSettledSubagentStatus(event.subagent.status)) {
+          return [true, state];
+        }
+        const inheritedBackgroundSubagents = new Map(state.inheritedBackgroundSubagents);
+        inheritedBackgroundSubagents.delete(event.subagent.id);
+        return [true, { ...state, inheritedBackgroundSubagents }];
+      }
       const moved = event.subagent;
       if (
         moved.origin === "provider_native" &&
@@ -537,13 +616,21 @@ export function routeProviderEvent(
       return [true, { ...adopted, workflowMemberParents }];
     }
     case "message.updated":
-      return [ownsRun(event.message.runId) || ownsChildThread(event.message.threadId), state];
+      return [
+        ownsRun(event.message.runId) ||
+          ownsChildThread(event.message.threadId) ||
+          (event.message.runId === null &&
+            state.inheritedBackgroundChildThreads.has(event.message.threadId)),
+        state,
+      ];
     case "steer.updated":
       return [ownsRun(event.runId), state];
     case "turn_item.updated": {
       if (
         ownsRun(event.turnItem.runId) ||
         ownsChildThread(event.turnItem.threadId) ||
+        (event.turnItem.runId === null &&
+          state.inheritedBackgroundChildThreads.has(event.turnItem.threadId)) ||
         ((event.turnItem.type === "todo_list" || event.turnItem.type === "proposed_plan") &&
           adoptsEarlierPlan(event.turnItem.threadId))
       ) {

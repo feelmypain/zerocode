@@ -599,14 +599,17 @@ export interface AcpAdapterV2Flavor {
   ) => Effect.Effect<void>;
   readonly subagentsIdleOnTurnCompletion?: boolean;
   /**
-   * Subagents the agent goes on running after its prompt, with no update when one ends. Asked
-   * when the prompt ends and when a reply the agent started by itself ends; the native task ids
-   * it returns hold the turn open and the rest become idle.
+   * Subagents the agent runs out-of-band with no ACP completion event. Polled while subagents
+   * are active and re-checked on reply boundaries; `running` holds the turn open, `settled`
+   * settles positively observed children even mid-turn, and unseen ids settle once the prompt ends.
    */
   readonly subagentsOutlivingPrompt?: (input: {
     readonly sessionId: string;
     readonly nativeTaskIds: ReadonlyArray<string>;
-  }) => Effect.Effect<ReadonlyArray<string>>;
+  }) => Effect.Effect<{
+    readonly running: ReadonlyArray<string>;
+    readonly settled: ReadonlyMap<string, "idle" | "completed" | "failed" | "cancelled">;
+  }>;
   readonly supportsCompaction?: boolean;
   /** Sends `/compact` as a prompt, only to sessions whose advertised commands include `compact`. */
   readonly compactViaAdvertisedCommand?: boolean;
@@ -4158,7 +4161,6 @@ export const makeAcpAdapterV2 = Effect.fn("makeAcpAdapterV2")(function* (
           if (acpSubagentStatusIsTerminal(taskStatus)) {
             subagent.terminalStatusProjected = true;
           } else if (
-            context.promptSettled &&
             !context.finalized &&
             !context.interrupted &&
             acpSubagentStatusBlocksTurnSettlement(taskStatus)
@@ -4551,38 +4553,46 @@ export const makeAcpAdapterV2 = Effect.fn("makeAcpAdapterV2")(function* (
           return false;
         };
 
-        const idleReportedSubagents = Effect.fn("AcpAdapterV2.idleReportedSubagents")(function* (
-          context: ActiveAcpTurn,
-        ) {
-          if (flavor.subagentsOutlivingPrompt === undefined) return;
-          const nativeTaskId = (subagent: ActiveAcpSubagent) =>
-            subagent.task.nativeTaskRef?.nativeId ?? String(subagent.task.id);
-          const running = [...context.subagents.values()].filter((subagent) =>
-            acpSubagentStatusBlocksTurnSettlement(subagent.task.status),
-          );
-          if (running.length === 0) return;
-          const atWork = yield* flavor.subagentsOutlivingPrompt({
-            sessionId: context.nativeThreadId,
-            nativeTaskIds: running.map(nativeTaskId),
-          });
-          if (context.finalized) return;
-          for (const subagent of running) {
-            if (
-              atWork.includes(nativeTaskId(subagent)) ||
-              !acpSubagentStatusBlocksTurnSettlement(subagent.task.status)
-            )
-              continue;
-            yield* emitSubagent(context, {
-              nativeTaskId: nativeTaskId(subagent),
-              prompt: subagent.task.prompt,
-              title: subagent.task.title,
-              model: subagent.task.model,
-              status: "idle",
-              childSessionId: subagent.childSessionId,
-              result: null,
+        const settleReportedSubagents = Effect.fn("AcpAdapterV2.settleReportedSubagents")(
+          function* (context: ActiveAcpTurn) {
+            if (flavor.subagentsOutlivingPrompt === undefined) return;
+            const nativeTaskId = (subagent: ActiveAcpSubagent) =>
+              subagent.task.nativeTaskRef?.nativeId ?? String(subagent.task.id);
+            const running = [...context.subagents.values()].filter((subagent) =>
+              acpSubagentStatusBlocksTurnSettlement(subagent.task.status),
+            );
+            if (running.length === 0) return;
+            const inspected = yield* flavor.subagentsOutlivingPrompt({
+              sessionId: context.nativeThreadId,
+              nativeTaskIds: running.map(nativeTaskId),
             });
-          }
-        });
+            if (context.finalized) return;
+            const stillRunning = new Set(inspected.running);
+            for (const subagent of running) {
+              const taskId = nativeTaskId(subagent);
+              if (
+                stillRunning.has(taskId) ||
+                !acpSubagentStatusBlocksTurnSettlement(subagent.task.status)
+              ) {
+                continue;
+              }
+              const observedStatus = inspected.settled.get(taskId);
+              // Before prompt settlement, a newly launched child may not have flushed to disk yet.
+              if (observedStatus === undefined && !context.promptSettled) {
+                continue;
+              }
+              yield* emitSubagent(context, {
+                nativeTaskId: taskId,
+                prompt: subagent.task.prompt,
+                title: subagent.task.title,
+                model: subagent.task.model,
+                status: observedStatus ?? "idle",
+                childSessionId: subagent.childSessionId,
+                result: null,
+              });
+            }
+          },
+        );
 
         const hasSurvivingBackgroundWork = (context: ActiveAcpTurn): boolean =>
           [...context.toolCallIdsByBackgroundTaskId.values()].some((toolCallId) => {
@@ -6117,13 +6127,13 @@ export const makeAcpAdapterV2 = Effect.fn("makeAcpAdapterV2")(function* (
             } else if (context.nativeThreadId === notification.sessionId) {
               if (update.sessionUpdate === "usage_update") {
                 context.replyOpen = false;
-                if (context.promptSettled) yield* idleReportedSubagents(context);
+                yield* settleReportedSubagents(context);
                 yield* rearmDeferredFinalize(context);
               } else if (acpRootSessionUpdateIngestsOutput(notification)) {
                 const wasReplyOpen = context.replyOpen;
                 context.replyOpen = true;
-                if (context.promptSettled && !wasReplyOpen) {
-                  yield* idleReportedSubagents(context);
+                if (!wasReplyOpen) {
+                  yield* settleReportedSubagents(context);
                 }
               }
             }
@@ -9218,7 +9228,7 @@ export const makeAcpAdapterV2 = Effect.fn("makeAcpAdapterV2")(function* (
           context: ActiveAcpTurn,
         ) {
           if (flavor.subagentsOutlivingPrompt === undefined) return;
-          if (!context.promptSettled || context.finalized || context.interrupted) return;
+          if (context.finalized || context.interrupted) return;
           if (context.subagentPollRunning) return;
           const hasBlockingSubagents = () =>
             [...context.subagents.values()].some((subagent) =>
@@ -9227,18 +9237,15 @@ export const makeAcpAdapterV2 = Effect.fn("makeAcpAdapterV2")(function* (
           if (!hasBlockingSubagents()) return;
           context.subagentPollRunning = true;
           yield* Effect.gen(function* () {
-            while (
-              !context.finalized &&
-              !context.interrupted &&
-              context.promptSettled &&
-              hasBlockingSubagents()
-            ) {
+            while (!context.finalized && !context.interrupted && hasBlockingSubagents()) {
               yield* Effect.sleep(ACP_SUBAGENT_POLL_INTERVAL);
               yield* runtimeCallbackPermit.withPermit(
                 Effect.gen(function* () {
-                  if (!context.promptSettled || context.finalized || context.interrupted) return;
-                  yield* idleReportedSubagents(context);
-                  yield* rearmDeferredFinalize(context);
+                  if (context.finalized || context.interrupted) return;
+                  yield* settleReportedSubagents(context);
+                  if (context.promptSettled) {
+                    yield* rearmDeferredFinalize(context);
+                  }
                 }),
               );
             }
@@ -9765,7 +9772,7 @@ export const makeAcpAdapterV2 = Effect.fn("makeAcpAdapterV2")(function* (
                     });
                     return;
                   }
-                  yield* idleReportedSubagents(context);
+                  yield* settleReportedSubagents(context);
                   if (context.finalized) return;
                   const deferredBackgroundWork =
                     defersFinalizeForBackgroundWork &&
@@ -10132,6 +10139,9 @@ export const makeAcpAdapterV2 = Effect.fn("makeAcpAdapterV2")(function* (
             // queued provider continuation owns wake traffic. A user turn may
             // start before that continuation and must leave its buffer intact.
             yield* projectDeferredCarryoverTerminals(rehydratedCarryoverSubagents);
+            if (!isContinuationTurn && rehydratedCarryoverSubagents.length > 0) {
+              yield* scheduleSubagentPoll(context);
+            }
             // Retain projected terminals during wake drain so monotonic guards reject replayed spawns.
             if (isContinuationTurn) {
               yield* Ref.set(continuationRequested, false);
@@ -10183,7 +10193,7 @@ export const makeAcpAdapterV2 = Effect.fn("makeAcpAdapterV2")(function* (
               context.promptSettled = true;
               context.promptSettledStatus = "completed";
               // The replayed reply ended before the prompt counted as settled.
-              yield* idleReportedSubagents(context);
+              yield* settleReportedSubagents(context);
               if (drainedWakeCount === 0) {
                 if (continuationWasRequested && defersFinalizeForBackgroundWork) {
                   if (hasDeferredBackgroundWork(context)) {

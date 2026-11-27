@@ -611,6 +611,175 @@ it("routes only exact same-thread background items inherited from settled runs",
   );
 });
 
+it("routes inherited background subagent, node, and child thread completion updates from settled runs", () => {
+  const threadId = ThreadId.make("thread:inherited-subagent-routing");
+  const childThreadId = ThreadId.make("thread:inherited-subagent-routing:child");
+  const priorRunId = RunId.make("run:inherited-subagent-routing:prior");
+  const currentRunId = RunId.make("run:inherited-subagent-routing:current");
+  const providerThreadId = ProviderThreadId.make("provider-thread:inherited-subagent-routing");
+  const subagentId = NodeId.make("node:inherited-subagent-routing:subagent");
+  const childRootNodeId = NodeId.make("node:inherited-subagent-routing:child-root");
+  const itemId = TurnItemId.make("turn-item:inherited-subagent-routing:subagent");
+  const selected = RunExecutionService.selectInheritedBackgroundTurnItems({
+    threadId,
+    currentProviderThreadId: providerThreadId,
+    currentRunOrdinal: 2,
+    runs: [
+      { id: priorRunId, threadId, ordinal: 1, status: "interrupted" } as OrchestrationV2Run,
+      { id: currentRunId, threadId, ordinal: 2, status: "running" } as OrchestrationV2Run,
+    ],
+    turnItems: [
+      {
+        id: itemId,
+        threadId,
+        runId: priorRunId,
+        nodeId: subagentId,
+        providerThreadId,
+        type: "subagent",
+        status: "running",
+        subagentId,
+        childThreadId,
+      } as OrchestrationV2TurnItem,
+    ],
+  });
+  assert.deepEqual(selected, [
+    { id: itemId, runId: priorRunId, subagentId, nodeId: subagentId, childThreadId },
+  ]);
+
+  const identity: RunExecutionService.ProviderEventRouteIdentity = {
+    threadId,
+    runId: currentRunId,
+    attemptId: RunAttemptId.make("attempt:inherited-subagent-routing:current"),
+    providerThreadId,
+  };
+  let state = RunExecutionService.makeProviderEventRoutingState({
+    identity,
+    inheritedBackgroundTurnItems: selected,
+    providerTurnId: null,
+  });
+
+  const childAssistantMessage = {
+    type: "message.updated",
+    driver,
+    message: { id: "msg-child", threadId: childThreadId, runId: null },
+  } as unknown as ProviderAdapter.ProviderAdapterV2Event;
+  const childToolItem = {
+    type: "turn_item.updated",
+    driver,
+    turnItem: {
+      id: TurnItemId.make("turn-item:inherited-subagent-routing:child-tool"),
+      threadId: childThreadId,
+      runId: null,
+      type: "command_execution",
+      status: "completed",
+    },
+  } as unknown as ProviderAdapter.ProviderAdapterV2Event;
+  const parentNodeCompleted = {
+    type: "node.updated",
+    driver,
+    node: {
+      id: subagentId,
+      threadId,
+      runId: priorRunId,
+      kind: "subagent",
+      status: "completed",
+      providerThreadId: null,
+    },
+  } as unknown as ProviderAdapter.ProviderAdapterV2Event;
+  const childRootNodeCompleted = {
+    type: "node.updated",
+    driver,
+    node: {
+      id: childRootNodeId,
+      threadId: childThreadId,
+      runId: null,
+      kind: "root_turn",
+      status: "completed",
+      providerThreadId: null,
+    },
+  } as unknown as ProviderAdapter.ProviderAdapterV2Event;
+  const subagentRunning = {
+    type: "subagent.updated",
+    driver,
+    subagent: {
+      id: subagentId,
+      threadId,
+      runId: priorRunId,
+      origin: "provider_native",
+      childThreadId,
+      status: "running",
+    },
+  } as unknown as ProviderAdapter.ProviderAdapterV2Event;
+  const subagentCompleted = {
+    type: "subagent.updated",
+    driver,
+    subagent: {
+      id: subagentId,
+      threadId,
+      runId: priorRunId,
+      origin: "provider_native",
+      childThreadId,
+      status: "completed",
+    },
+  } as unknown as ProviderAdapter.ProviderAdapterV2Event;
+  const unrelatedSubagent = {
+    type: "subagent.updated",
+    driver,
+    subagent: {
+      id: NodeId.make("node:inherited-subagent-routing:other"),
+      threadId,
+      runId: priorRunId,
+      origin: "provider_native",
+      childThreadId: null,
+      status: "completed",
+    },
+  } as unknown as ProviderAdapter.ProviderAdapterV2Event;
+  const turnItemCompleted = {
+    type: "turn_item.updated",
+    driver,
+    turnItem: {
+      id: itemId,
+      threadId,
+      runId: priorRunId,
+      type: "subagent",
+      status: "completed",
+    },
+  } as unknown as ProviderAdapter.ProviderAdapterV2Event;
+
+  let accepted: boolean;
+  [accepted, state] = RunExecutionService.routeProviderEvent(
+    childAssistantMessage,
+    identity,
+    state,
+  );
+  assert.isTrue(accepted);
+  [accepted, state] = RunExecutionService.routeProviderEvent(childToolItem, identity, state);
+  assert.isTrue(accepted);
+  [accepted, state] = RunExecutionService.routeProviderEvent(parentNodeCompleted, identity, state);
+  assert.isTrue(accepted);
+  [accepted, state] = RunExecutionService.routeProviderEvent(
+    childRootNodeCompleted,
+    identity,
+    state,
+  );
+  assert.isTrue(accepted);
+  assert.isFalse(
+    RunExecutionService.routeProviderEvent(childAssistantMessage, identity, state)[0],
+    "child thread events stop routing once the inherited child root_turn settles",
+  );
+  assert.isFalse(RunExecutionService.routeProviderEvent(unrelatedSubagent, identity, state)[0]);
+  [accepted, state] = RunExecutionService.routeProviderEvent(subagentRunning, identity, state);
+  assert.isTrue(accepted);
+  [accepted, state] = RunExecutionService.routeProviderEvent(subagentCompleted, identity, state);
+  assert.isTrue(accepted);
+  assert.isFalse(
+    RunExecutionService.routeProviderEvent(subagentRunning, identity, state)[0],
+    "a nonterminal replay must not resurrect a settled inherited subagent",
+  );
+  [accepted, state] = RunExecutionService.routeProviderEvent(turnItemCompleted, identity, state);
+  assert.isTrue(accepted);
+});
+
 it("routes an earlier run's plan rows to this thread's active root turn only", () => {
   const threadId = ThreadId.make("thread:earlier-plan-routing");
   const priorRunId = RunId.make("run:earlier-plan-routing:prior");

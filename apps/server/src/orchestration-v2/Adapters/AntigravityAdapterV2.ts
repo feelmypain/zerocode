@@ -33,7 +33,7 @@ import {
   ANTIGRAVITY_SUBAGENT_BATCH_TITLE,
   antigravitySubagentLaunches,
   describeAntigravitySubagentLaunches,
-  readAntigravityChildrenAtWork,
+  readAntigravityDetachedSubagentStatuses,
   readAntigravityPendingReply,
 } from "../../provider/acp/AntigravityChildWork.ts";
 import { readAntigravityClientTextFile } from "../../provider/acp/AntigravityClientFiles.ts";
@@ -316,7 +316,7 @@ export function makeAntigravityAcpAdapterFlavor(
           watchPromptOutcome: (sessionId: string) =>
             watchAntigravityPromptOutcome(profileDirectory, sessionId),
           subagentsOutlivingPrompt: ({ sessionId, nativeTaskIds }) =>
-            readAntigravityChildrenAtWork({
+            readAntigravityDetachedSubagentStatuses({
               profileDirectory,
               rootSessionId: sessionId,
               toolCallIds: nativeTaskIds,

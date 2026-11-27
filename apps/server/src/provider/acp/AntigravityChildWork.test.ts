@@ -13,6 +13,7 @@ import {
   describeAntigravitySubagentLaunches,
   readAntigravityChildrenAtWork,
   readAntigravityChildWork,
+  readAntigravityDetachedSubagentStatuses,
   readAntigravityPendingReply,
 } from "./AntigravityChildWork.ts";
 import { sanitizeAntigravityToolPayload } from "./AntigravityProtocol.ts";
@@ -683,7 +684,9 @@ it.layer(NodeServices.layer)("readAntigravityChildWork", (it) => {
       Effect.gen(function* () {
         const fs = yield* FileSystem.FileSystem;
         const path = yield* Path.Path;
-        const profile = yield* fs.makeTempDirectoryScoped({ prefix: "zerocode-agy-pending-reply-" });
+        const profile = yield* fs.makeTempDirectoryScoped({
+          prefix: "zerocode-agy-pending-reply-",
+        });
         const write = (segments: ReadonlyArray<string>, body: string) => {
           const file = path.join(
             profile,
@@ -767,7 +770,9 @@ it.layer(NodeServices.layer)("readAntigravityChildWork", (it) => {
         expect(yield* pending()).toBe(false);
 
         // Symlinked transcript fails closed.
-        const outside = yield* fs.makeTempDirectoryScoped({ prefix: "zerocode-agy-pending-outside-" });
+        const outside = yield* fs.makeTempDirectoryScoped({
+          prefix: "zerocode-agy-pending-outside-",
+        });
         const external = path.join(outside, "transcript.jsonl");
         yield* fs.writeFileString(
           external,
@@ -891,6 +896,126 @@ it.layer(NodeServices.layer)("readAntigravityChildWork", (it) => {
             ],
           }),
         ).toEqual(["call_tool", "call_woken"]);
+      }),
+  );
+
+  it.effect(
+    "classifies settled detached subagent outcomes and leaves unseen launches unclassified",
+    () =>
+      Effect.gen(function* () {
+        const fs = yield* FileSystem.FileSystem;
+        const path = yield* Path.Path;
+        const profile = yield* fs.makeTempDirectoryScoped({ prefix: "zerocode-agy-statuses-" });
+        const writeFile = (segments: ReadonlyArray<string>, content: string) => {
+          const target = path.join(profile, "antigravity-acp", "brain", ...segments);
+          return fs
+            .makeDirectory(path.dirname(target), { recursive: true })
+            .pipe(Effect.andThen(fs.writeFileString(target, content)));
+        };
+        const writeDetached = (
+          convId: string,
+          callId: string,
+          state: string | undefined,
+          transcriptLine?: Record<string, unknown>,
+        ) =>
+          Effect.all([
+            writeFile(
+              [ROOT, ".system_generated", "subagents", `${convId}.json`],
+              JSON.stringify({ conversationId: convId, ...(state ? { state } : {}) }),
+            ),
+            writeFile(
+              [convId, ".system_generated", "messages", "launch.json"],
+              JSON.stringify({
+                sender: ROOT,
+                sourceMetadata: {
+                  tool: {
+                    conversationId: ROOT,
+                    toolCall: { id: callId, name: "invoke_subagent" },
+                  },
+                },
+              }),
+            ),
+            ...(transcriptLine === undefined
+              ? []
+              : [
+                  writeFile(
+                    [convId, ".system_generated", "logs", "transcript.jsonl"],
+                    `${JSON.stringify(transcriptLine)}\n`,
+                  ),
+                ]),
+          ]);
+
+        const childRunning = "10000000-0000-4000-8000-000000000001";
+        const childReported = "10000000-0000-4000-8000-000000000002";
+        const childCompleted = "10000000-0000-4000-8000-000000000003";
+        const childFailed = "10000000-0000-4000-8000-000000000004";
+        const childKilled = "10000000-0000-4000-8000-000000000005";
+        const childSwarmDone = "10000000-0000-4000-8000-000000000006";
+        const childSwarmFailed = "10000000-0000-4000-8000-000000000007";
+
+        yield* writeDetached(childRunning, "call_running", "SUBAGENT_STATE_ALIVE");
+        yield* writeDetached(childReported, "call_reported", "SUBAGENT_STATE_ALIVE");
+        yield* writeFile(
+          [ROOT, ".system_generated", "messages", "report.json"],
+          JSON.stringify({ sender: childReported }),
+        );
+        yield* writeDetached(childCompleted, "call_completed", "SUBAGENT_STATE_COMPLETED");
+        yield* writeDetached(childFailed, "call_failed", "SUBAGENT_STATE_ALIVE", {
+          step_index: 1,
+          type: "PLANNER_RESPONSE",
+          status: "ERROR",
+          content: "Boom",
+        });
+        yield* writeDetached(childKilled, "call_killed", "SUBAGENT_STATE_KILLED");
+        yield* writeDetached(childSwarmDone, "call_swarm_done", "SUBAGENT_STATE_ALIVE");
+        yield* writeDetached(childSwarmFailed, "call_swarm_failed", "SUBAGENT_STATE_ALIVE");
+        yield* writeFile(
+          [ROOT, ".system_generated", "swarm", "members.json"],
+          JSON.stringify({
+            members: {
+              finisher: { conversation_id: childSwarmDone, role: "worker", phase: "DONE" },
+              crasher: { conversation_id: childSwarmFailed, role: "worker", phase: "FAILED" },
+            },
+          }),
+        );
+
+        const statuses = yield* readAntigravityDetachedSubagentStatuses({
+          profileDirectory: profile,
+          rootSessionId: ROOT,
+          toolCallIds: [
+            "call_running",
+            "call_reported",
+            "call_completed",
+            "call_failed",
+            "call_killed",
+            "call_swarm_done",
+            "call_swarm_failed",
+            "call_unflushed",
+          ],
+        });
+        expect(statuses.running).toEqual(["call_running"]);
+        expect(Object.fromEntries(statuses.settled)).toEqual({
+          call_reported: "idle",
+          call_completed: "completed",
+          call_failed: "failed",
+          call_killed: "cancelled",
+          call_swarm_done: "completed",
+          call_swarm_failed: "failed",
+        });
+        expect(statuses.settled.has("call_unflushed")).toBe(false);
+
+        // A corrupt parent inbox file must not blind transcript/state settlement checks.
+        yield* writeFile([ROOT, ".system_generated", "messages", "corrupt.json"], "{not json");
+        const fallback = yield* readAntigravityDetachedSubagentStatuses({
+          profileDirectory: profile,
+          rootSessionId: ROOT,
+          toolCallIds: ["call_running", "call_failed", "call_killed"],
+        });
+        expect(fallback.running).toEqual(["call_running"]);
+        expect(Object.fromEntries(fallback.settled)).toEqual({
+          call_failed: "failed",
+          call_killed: "cancelled",
+        });
       }),
   );
 });
