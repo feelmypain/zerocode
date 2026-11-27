@@ -18,7 +18,7 @@ interface AppleSpeechModule {
   transcribeWithAppleSpeech: (uri: string, locale: string) => Promise<string>;
 }
 
-const native = requireOptionalNativeModule<AppleSpeechModule>("T3VoiceTranscription");
+const native = requireOptionalNativeModule<AppleSpeechModule>("ZeroCodeVoiceTranscription");
 const isVoiceTranscriptionError = Schema.is(VoiceTranscriptionError);
 
 /** The user's ordered Language & Region list, then the app locale; the app ships in English only. */

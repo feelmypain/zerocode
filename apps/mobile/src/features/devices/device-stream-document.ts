@@ -45,7 +45,7 @@ export function deviceStreamDocument(
   const safeScript = script.replace(/<\/script/gi, "<\\/script");
   const safeStoppedDetail = JSON.stringify(stoppedDetail).replace(/</g, "\\u003c");
   const failure = `window.ReactNativeWebView.postMessage(JSON.stringify({type:"status",status:"error",detail:${safeStoppedDetail}}));`;
-  return `<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no"></head><body><script>window.addEventListener("error",function(){${failure}});window.addEventListener("unhandledrejection",function(){${failure}});\n${safeScript}\ntry{T3DeviceStream.start(${safeConfiguration});}catch{${failure}}</script></body></html>`;
+  return `<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no"></head><body><script>window.addEventListener("error",function(){${failure}});window.addEventListener("unhandledrejection",function(){${failure}});\n${safeScript}\ntry{ZeroCodeDeviceStream.start(${safeConfiguration});}catch{${failure}}</script></body></html>`;
 }
 
 export function deviceStreamMessage(data: string) {

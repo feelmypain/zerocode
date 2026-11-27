@@ -60,7 +60,9 @@ const units = [
 ] as const;
 
 function systemUses24HourClock() {
-  return requireNativeModule<{ is24HourFormat(): boolean }>("T3NativeControls").is24HourFormat();
+  return requireNativeModule<{ is24HourFormat(): boolean }>(
+    "ZeroCodeNativeControls",
+  ).is24HourFormat();
 }
 
 export function CustomSnoozeSheet(props: Props) {

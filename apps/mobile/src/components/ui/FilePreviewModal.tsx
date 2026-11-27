@@ -34,7 +34,7 @@ const NativeControls = requireNativeModule<{
   updateFile(identifier: string, index: number, uri: string | null): Promise<void>;
   dismissFile(identifier: string): Promise<void>;
   isFilePreviewFinished(identifier: string): boolean;
-}>("T3NativeControls");
+}>("ZeroCodeNativeControls");
 
 // Null tells the viewer an image failed; undefined means its URL has not arrived yet.
 const nativeUri = (image: FilePreviewImage) => (image.failed ? null : image.uri);
