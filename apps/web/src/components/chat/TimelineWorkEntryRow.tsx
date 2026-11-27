@@ -60,6 +60,7 @@ import { cn } from "~/lib/utils";
 import type { MessageResolver } from "~/i18n/messages";
 import { formatUpcomingTimestamp } from "../../timestampFormat";
 import { FetchedToolOutput, V2ItemInspector } from "./V2ItemInspector";
+import { QuestionHoverPreview } from "./QuestionHoverPreview";
 import { SubagentNotificationLink } from "./V2LifecycleRow";
 import {
   TimelineRowCtx,
@@ -438,9 +439,25 @@ function WorkEntryLogRow(props: WorkEntryRowProps) {
       ? undefined
       : (workEntry.toolIcon ?? workEntry.toolSource?.icon);
   const isReasoning = workEntry.itemType === "reasoning";
+  const projectedQuestions =
+    workEntry.projectedItem?.item.type === "user_input_request"
+      ? workEntry.projectedItem.item.questions
+          .map((question) => ({ id: question.id, text: question.question.trim() }))
+          .filter((question) => question.text.length > 0)
+      : [];
+  const answeredQuestions = workEntry.questionAnswer
+    ? Object.entries(workEntry.questionAnswer.questionTextById ?? {})
+        .map(([id, text]) => ({ id, text: text.trim() }))
+        .filter((question) => question.text.length > 0)
+    : [];
+  const fullQuestions = answeredQuestions.length > 0 ? answeredQuestions : projectedQuestions;
+  const isQuestionRow =
+    workEntry.questionAnswer !== undefined || workEntry.itemType === "user_input_request";
   const questionHeading = workEntry.questionAnswer
     ? getQuestionTextPreview(workEntry.questionAnswer)
-    : "";
+    : projectedQuestions.length > 0
+      ? projectedQuestions.map((question) => question.text.replace(/\s+/g, " ")).join(" · ")
+      : "";
   const previewText =
     isReasoning && expanded
       ? workEntry.toolLifecycleStatus === "inProgress"
@@ -594,49 +611,78 @@ function WorkEntryLogRow(props: WorkEntryRowProps) {
       label={
         <div className="min-w-0 flex-1 overflow-hidden">
           <p className="flex min-w-0 w-full items-baseline gap-1.5 text-sm leading-relaxed">
-            <span
-              ref={labelRef}
-              className={cn(
-                answerPreview || mcpSignIn ? "min-w-0" : "min-w-0 flex-1",
-                "truncate",
-                headingClass,
-              )}
-            >
-              {isReasoning && !expanded ? (
-                <ChatMarkdown
-                  inline
-                  text={sliceThoughtPreviewSource(workEntry.detail ?? previewText)}
-                  cwd={ctx.markdownCwd}
-                  parseRawHtml={false}
-                  extensions={
-                    workEntry.toolLifecycleStatus === "inProgress"
-                      ? thoughtPreviewMarkdown(gt("Thinking"))
-                      : thoughtPreviewMarkdown(gt("Thought"))
-                  }
-                />
-              ) : threadLabel ? (
-                <ThreadReadLabel
-                  label={threadLabel}
-                  environmentId={ctx.activeThreadEnvironmentId}
-                  linked
-                />
-              ) : (
-                previewText
-              )}
-            </span>
-            {answerPreview ? (
-              <span
+            {isQuestionRow && !expanded && fullQuestions.length > 0 ? (
+              <QuestionHoverPreview
+                forceReveal={
+                  fullQuestions.length > 1 ||
+                  fullQuestions.some((question) => question.text.includes("\n"))
+                }
                 className={cn(
-                  "min-w-0 truncate",
-                  !expanded &&
-                    workEntry.questionAnswer &&
-                    hasQuestionAnswer(workEntry.questionAnswer)
-                    ? "text-foreground"
-                    : "text-muted-foreground",
+                  answerPreview || mcpSignIn ? "min-w-0" : "min-w-0 flex-1",
+                  "truncate",
+                  headingClass,
+                )}
+                previewContent={
+                  fullQuestions.length === 1 ? (
+                    fullQuestions[0]?.text
+                  ) : (
+                    <div className="flex flex-col gap-2">
+                      {fullQuestions.map((question) => (
+                        <p key={question.id}>{question.text}</p>
+                      ))}
+                    </div>
+                  )
+                }
+              >
+                {previewText}
+              </QuestionHoverPreview>
+            ) : (
+              <span
+                ref={labelRef}
+                className={cn(
+                  answerPreview || mcpSignIn ? "min-w-0" : "min-w-0 flex-1",
+                  "truncate",
+                  headingClass,
                 )}
               >
-                {answerPreview}
+                {isReasoning && !expanded ? (
+                  <ChatMarkdown
+                    inline
+                    text={sliceThoughtPreviewSource(workEntry.detail ?? previewText)}
+                    cwd={ctx.markdownCwd}
+                    parseRawHtml={false}
+                    extensions={
+                      workEntry.toolLifecycleStatus === "inProgress"
+                        ? thoughtPreviewMarkdown(gt("Thinking"))
+                        : thoughtPreviewMarkdown(gt("Thought"))
+                    }
+                  />
+                ) : threadLabel ? (
+                  <ThreadReadLabel
+                    label={threadLabel}
+                    environmentId={ctx.activeThreadEnvironmentId}
+                    linked
+                  />
+                ) : (
+                  previewText
+                )}
               </span>
+            )}
+            {answerPreview ? (
+              !expanded ? (
+                <QuestionHoverPreview
+                  className={cn(
+                    "min-w-0 truncate",
+                    workEntry.questionAnswer && hasQuestionAnswer(workEntry.questionAnswer)
+                      ? "text-foreground"
+                      : "text-muted-foreground",
+                  )}
+                >
+                  {answerPreview}
+                </QuestionHoverPreview>
+              ) : (
+                <span className="min-w-0 truncate text-muted-foreground">{answerPreview}</span>
+              )
             ) : null}
             {mcpSignIn}
           </p>

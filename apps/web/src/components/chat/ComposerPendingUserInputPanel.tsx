@@ -13,6 +13,7 @@ import { Kbd } from "../ui/kbd";
 import { cn } from "~/lib/utils";
 import { isInSideChatPane } from "~/lib/sideChatPane";
 import { ComposerBanner } from "./ComposerBanner";
+import { QuestionHoverPreview } from "./QuestionHoverPreview";
 import ChatMarkdown from "../ChatMarkdown";
 
 interface PendingUserInputPanelProps {
@@ -214,21 +215,31 @@ const ComposerPendingUserInputCard = memo(function ComposerPendingUserInputCard(
         className="px-4 py-1.5"
       >
         <ComposerBanner.Content>
-          <span
-            className={cn("min-w-0 truncate text-muted-foreground", isCollapsed && "max-w-1/2")}
+          <QuestionHoverPreview
             dir={textDirection(activeQuestion.header)}
+            className={cn("min-w-0 truncate text-muted-foreground", isCollapsed && "max-w-1/2")}
           >
             {activeQuestion.header}
-          </span>
+          </QuestionHoverPreview>
           {isCollapsed ? (
             <>
               <ComposerBanner.Separator />
-              <span
-                className={cn("min-w-0 flex-1 truncate text-secondary-label", questionTextAlign)}
+              <QuestionHoverPreview
+                forceReveal={activeQuestion.question.includes("\n")}
                 dir={markdownProseDirection(activeQuestion.question)}
+                className={cn("min-w-0 flex-1 truncate text-secondary-label", questionTextAlign)}
+                previewContent={
+                  <ChatMarkdown
+                    text={activeQuestion.question}
+                    cwd={cwd}
+                    threadRef={threadRef}
+                    lineBreaks
+                    className={cn("text-foreground", questionTextAlign)}
+                  />
+                }
               >
                 {activeQuestion.question}
-              </span>
+              </QuestionHoverPreview>
             </>
           ) : null}
         </ComposerBanner.Content>

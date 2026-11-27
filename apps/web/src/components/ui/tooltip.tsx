@@ -144,27 +144,39 @@ function TooltipPopup({
   align?: TooltipPrimitive.Positioner.Props["align"];
   side?: TooltipPrimitive.Positioner.Props["side"];
   sideOffset?: TooltipPrimitive.Positioner.Props["sideOffset"];
-  variant?: "default" | "glass" | "code";
+  variant?: "default" | "glass" | "code" | "preview";
   anchor?: TooltipPrimitive.Positioner.Props["anchor"];
 }) {
+  const isPreview = variant === "preview";
   return (
     <TooltipPrimitive.Portal>
       <TooltipPositioner align={align} anchor={anchor} side={side} sideOffset={sideOffset}>
         <TooltipPrimitive.Popup
           className={cn(
-            "relative flex origin-(--transform-origin) rounded-md text-popover-foreground text-xs transition-[scale,opacity] before:pointer-events-none before:absolute before:inset-0 before:rounded-[calc(var(--radius-md)-1px)] before:shadow-[0_1px_--theme(--color-black/4%)] data-ending-style:scale-98 data-starting-style:scale-98 data-ending-style:opacity-0 data-starting-style:opacity-0 data-instant:duration-0 dark:before:shadow-[0_-1px_--theme(--color-white/6%)]",
+            "relative flex origin-(--transform-origin) text-popover-foreground before:pointer-events-none before:absolute before:inset-0 before:rounded-[calc(var(--radius-md)-1px)] before:shadow-[0_1px_--theme(--color-black/4%)] data-ending-style:opacity-0 data-starting-style:opacity-0 data-instant:duration-0 dark:before:shadow-[0_-1px_--theme(--color-white/6%)]",
+            isPreview
+              ? "pointer-events-auto max-w-[min(34rem,calc(100vw-2rem))] rounded-xl text-sm leading-relaxed whitespace-normal wrap-anywhere dropdown-glass shadow-xl shadow-black/25 before:hidden transition-[scale,opacity,translate] duration-200 ease-out data-starting-style:scale-98 data-starting-style:translate-y-1 data-ending-style:scale-98 data-ending-style:translate-y-0.5 motion-reduce:transition-none"
+              : "rounded-md text-xs transition-[scale,opacity] data-ending-style:scale-98 data-starting-style:scale-98",
             variant === "glass"
               ? "dropdown-glass shadow-xl shadow-black/25 before:hidden"
-              : "border bg-popover not-dark:bg-clip-padding shadow-md/5",
+              : !isPreview && "border bg-popover not-dark:bg-clip-padding shadow-md/5",
             variant === "code"
               ? "max-w-120 wrap-anywhere text-left font-mono text-[11px] leading-relaxed"
-              : "max-w-80 wrap-anywhere whitespace-normal leading-snug",
+              : !isPreview && "max-w-80 wrap-anywhere whitespace-normal leading-snug",
             className,
           )}
           data-slot="tooltip-popup"
           {...props}
         >
-          <div className="min-w-0 px-2 py-1" data-slot="tooltip-viewport">
+          <div
+            className={cn(
+              "min-w-0",
+              isPreview
+                ? "max-h-72 overflow-y-auto px-3 py-2 text-foreground select-text"
+                : "px-2 py-1",
+            )}
+            data-slot="tooltip-viewport"
+          >
             {children}
           </div>
         </TooltipPrimitive.Popup>
