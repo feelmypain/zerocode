@@ -439,7 +439,12 @@ export type BuildThreadActionItemsThread = Pick<
   Partial<
     Pick<
       SidebarThreadSummary,
-      "pullRequests" | "linkedPullRequest" | "branchPullRequest" | "opens" | "latestUserMessageAt"
+      | "ephemeral"
+      | "pullRequests"
+      | "linkedPullRequest"
+      | "branchPullRequest"
+      | "opens"
+      | "latestUserMessageAt"
     >
   > & {
     updatedAt: string;
@@ -467,6 +472,7 @@ export function buildThreadActionItems<TThread extends BuildThreadActionItemsThr
   const visibleThreads = input.threads.filter(
     (thread) =>
       thread.archivedAt === null &&
+      thread.ephemeral !== true &&
       !isShownUnderParent(
         { environmentId: thread.environmentId, threadId: thread.id },
         thread.lineage,

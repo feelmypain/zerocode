@@ -28,14 +28,14 @@ export function ComposerEphemeralButton({
       : gt("Enable ephemeral chat");
   const tooltipLabel = active ? (
     mode === "server" ? (
-      <T>Ephemeral chat. Deletes when you leave. Click to keep permanently.</T>
+      <T>Ephemeral chat. Deletes when you leave this chat. Click to keep permanently.</T>
     ) : (
-      <T>Ephemeral chat. Deletes when you leave. Click to turn off.</T>
+      <T>Ephemeral chat. Deletes when you leave this chat. Click to turn off.</T>
     )
   ) : mode === "server" ? (
-    <T>New ephemeral chat. Deletes when you leave.</T>
+    <T>New ephemeral chat. Deletes when you leave this chat.</T>
   ) : (
-    <T>Ephemeral chat. Deletes when you leave.</T>
+    <T>Ephemeral chat. Deletes when you leave this chat.</T>
   );
 
   return (

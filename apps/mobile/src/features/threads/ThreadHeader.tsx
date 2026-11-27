@@ -17,6 +17,7 @@ import {
 export function ThreadHeader(props: {
   readonly title: string;
   readonly subtitle: string;
+  readonly ephemeral?: boolean;
   readonly gitControls: ThreadGitControlsProps;
   readonly onReturnToThread?: () => void;
   readonly draft?: boolean;
@@ -32,6 +33,11 @@ export function ThreadHeader(props: {
   const gitMenu = useThreadGitMenuDefinition(props.gitControls);
   const terminalMenu = threadTerminalMenu(props.gitControls, m);
   const filesVisible = props.inspectorMode === "files" && panes.auxiliaryPaneVisible;
+  const subtitle = props.ephemeral
+    ? props.subtitle
+      ? `${gt("Ephemeral")} · ${props.subtitle}`
+      : gt("Ephemeral")
+    : props.subtitle;
   const actions: AppBarAction[] = props.hasThreadCwd
     ? [
         {
@@ -49,7 +55,7 @@ export function ThreadHeader(props: {
   return (
     <AppBar
       title={props.title}
-      subtitle={props.subtitle}
+      subtitle={subtitle}
       onBackToList={goBack}
       onCompose={props.draft ? undefined : startNewTask}
       backInSplitView={

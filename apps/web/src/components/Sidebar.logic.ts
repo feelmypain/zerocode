@@ -17,7 +17,11 @@ import {
   threadSearchSubject,
   type ThreadSearchShell,
 } from "@zerocode/client-runtime/state/thread-search";
-import { foldSearchQuery, rankSearchItems, scoreThreadSearch } from "@zerocode/shared/paletteSearch";
+import {
+  foldSearchQuery,
+  rankSearchItems,
+  scoreThreadSearch,
+} from "@zerocode/shared/paletteSearch";
 import {
   type ContextMenuItem,
   type EnvironmentId,
@@ -551,6 +555,7 @@ type ScopedSidebarThread = ThreadSortInput & {
   environmentId: string;
   projectId: string;
   archivedAt: string | null;
+  ephemeral?: boolean | undefined;
 };
 
 type LogicalSidebarProject = SidebarProject & {
@@ -597,6 +602,7 @@ export async function deleteSelectedThreadEntries<
 export function filterSidebarV2VisibleThreads<
   T extends Pick<SidebarThreadSummary, "archivedAt" | "environmentId" | "id" | "lineage"> & {
     projectId: string;
+    ephemeral?: boolean | undefined;
   },
 >(
   threads: readonly T[],
@@ -606,6 +612,7 @@ export function filterSidebarV2VisibleThreads<
   return threads.filter(
     (thread) =>
       thread.archivedAt === null &&
+      thread.ephemeral !== true &&
       !isShownUnderParent(
         { environmentId: thread.environmentId, threadId: thread.id },
         thread.lineage,
@@ -1435,7 +1442,7 @@ export function sortLogicalProjectsForSidebar<
   );
   const threadsByProjectKey = new Map<string, TThread[]>();
   for (const thread of threads) {
-    if (thread.archivedAt !== null) continue;
+    if (thread.archivedAt !== null || thread.ephemeral === true) continue;
     const projectKey = groupKeyByProjectRef.get(`${thread.environmentId}\0${thread.projectId}`);
     if (!projectKey) continue;
     const existing = threadsByProjectKey.get(projectKey);
@@ -1484,7 +1491,7 @@ export function sortScopedProjectsForSidebar<
     `${environmentId}\u0000${projectId}`;
   const threadsByProject = new Map<string, TThread[]>();
   for (const thread of threads) {
-    if (thread.archivedAt !== null) {
+    if (thread.archivedAt !== null || thread.ephemeral === true) {
       continue;
     }
     const key = scopedKey(thread.environmentId, thread.projectId);

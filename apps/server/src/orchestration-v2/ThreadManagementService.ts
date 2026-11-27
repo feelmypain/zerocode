@@ -1940,6 +1940,17 @@ const make = Effect.gen(function* () {
       const nowMs = DateTime.toEpochMillis(yield* DateTime.now);
       let deletedCount = 0;
       for (const [index, threadId] of targetIds.entries()) {
+        const shell = yield* orchestrator.getThreadShell(threadId).pipe(
+          Effect.catch((error) =>
+            Effect.logWarning("Failed to inspect ephemeral thread during cleanup", {
+              threadId,
+              error: error.message,
+            }).pipe(Effect.as(null)),
+          ),
+        );
+        if (shell === null || shell.deletedAt !== null || shell.ephemeral !== true) {
+          continue;
+        }
         const deleted = yield* orchestrator
           .dispatch({
             type: "thread.delete",

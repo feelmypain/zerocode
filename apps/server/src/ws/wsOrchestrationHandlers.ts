@@ -1008,6 +1008,7 @@ export const makeOrchestrationHandlers = Effect.fn("ws.handlers.orchestration")(
                       ...(input.generateTitle === undefined
                         ? {}
                         : { generateTitle: input.generateTitle }),
+                      ...(input.ephemeral === undefined ? {} : { ephemeral: input.ephemeral }),
                       modelSelection: input.modelSelection,
                       runtimeMode: input.runtimeMode,
                       interactionMode: input.interactionMode,

@@ -37,7 +37,12 @@ import { vcsEnvironment } from "../state/vcs";
 import { useNewThreadHandler } from "./useHandleNewThread";
 import { refreshArchivedThreadsForEnvironment } from "../lib/archivedThreadsState";
 import { releaseComposerDraftUploads } from "../lib/composerDraftUploads";
-import { untrackSessionEphemeralThread } from "../lib/ephemeralThreads";
+import {
+  markSessionEphemeralThreadKept,
+  trackSessionEphemeralThread,
+  unmarkSessionEphemeralThreadKept,
+  untrackSessionEphemeralThread,
+} from "../lib/ephemeralThreads";
 import { announce } from "../lib/announce";
 import { m } from "../i18n/messages";
 import { readLocalApi } from "../localApi";
@@ -1067,12 +1072,16 @@ export function useThreadActions() {
   const keepEphemeralThread = async (target: ScopedThreadRef) => {
     const permissionFailure = threadOperationFailure(target);
     if (permissionFailure) return permissionFailure;
+    markSessionEphemeralThreadKept(target);
     const result = await updateThreadMetadataMutation({
       environmentId: target.environmentId,
       input: { threadId: target.threadId, ephemeral: false },
     });
-    if (result._tag === "Success") {
-      untrackSessionEphemeralThread(target);
+    if (result._tag !== "Success") {
+      unmarkSessionEphemeralThreadKept(target);
+      if (readThreadShell(target)?.ephemeral === true) {
+        trackSessionEphemeralThread(target);
+      }
     }
     return result;
   };

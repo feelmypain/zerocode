@@ -138,3 +138,37 @@ it("lists empty drafts by terminal label while their terminal exists, active or 
   await expect.element(rows).toHaveAccessibleName("dev, Unsent draft");
   expect(rows.elements()).toHaveLength(1);
 });
+
+it("hides ephemeral drafts from the sidebar draft block until ephemeral mode is disabled", async () => {
+  const initial = useComposerDraftStore.getState();
+  using _store = {
+    [Symbol.dispose]: () => useComposerDraftStore.setState(initial, true),
+  };
+  useComposerDraftStore.setState({
+    draftsByThreadKey: {},
+    draftThreadsByThreadKey: {},
+    logicalProjectDraftThreadKeyByLogicalProjectKey: {},
+  });
+  const environmentId = EnvironmentId.make("draft-ephemeral-environment");
+  const projectRef = scopeProjectRef(environmentId, ProjectId.make("draft-ephemeral-project"));
+  const ephemeralDraftId = DraftId.make("draft-ephemeral");
+  const threadId = ThreadId.make("draft-ephemeral-thread");
+
+  await using screen = await render(
+    <ul>
+      <DraftBlock />
+    </ul>,
+  );
+  const rows = screen.getByTestId("sidebar-draft-row");
+
+  await act(() => {
+    initial.setProjectDraftThreadId(projectRef, ephemeralDraftId, { threadId, ephemeral: true });
+    initial.setPrompt(ephemeralDraftId, "Throwaway prompt");
+  });
+  await expect.element(rows).not.toBeInTheDocument();
+
+  await act(() => {
+    initial.setDraftThreadContext(ephemeralDraftId, { ephemeral: false });
+  });
+  await expect.element(rows).toHaveAccessibleName("Throwaway prompt, Unsent draft");
+});

@@ -142,4 +142,27 @@ describe("buildPendingNewTasks", () => {
       new Set(["syncing", "read-only", "retrying", "offline", "sending"]),
     );
   });
+
+  it("excludes queued ephemeral creations from pending new tasks", () => {
+    const normal = queuedCreation("offline");
+    const ephemeral: QueuedThreadMessage = {
+      ...queuedCreation("ephemeral-offline"),
+      creation: {
+        ...queuedCreation("ephemeral-offline").creation!,
+        ephemeral: true,
+      },
+    };
+    const tasks = buildPendingNewTasks({
+      queuedMessages: [normal, ephemeral],
+      drafts: {},
+      sendGate: {
+        connectedEnvironmentIds: new Set(),
+        operableEnvironmentIds: new Set(),
+        shellStatuses: new Map(),
+        retryingMessageIds: {},
+      },
+    });
+
+    expect(tasks.map((task) => task.environmentId)).toEqual(["offline"]);
+  });
 });

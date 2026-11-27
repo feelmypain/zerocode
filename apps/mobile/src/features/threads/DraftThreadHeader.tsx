@@ -52,6 +52,7 @@ export function DraftThreadHeader(props: {
       draft
       title={gt("New thread")}
       subtitle=""
+      ephemeral={props.thread.ephemeral === true}
       hasThreadCwd={props.cwd !== null}
       inspectorMode={null}
       onOpenFilesInspector={openFiles}

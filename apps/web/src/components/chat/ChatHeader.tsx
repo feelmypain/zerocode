@@ -413,9 +413,9 @@ export const ChatHeader = memo(function ChatHeader({
               }
               label={
                 isServerThread && canOperateThread ? (
-                  <T>Deletes when you leave the app. Click to keep permanently.</T>
+                  <T>Deletes when you leave this chat. Click to keep permanently.</T>
                 ) : (
-                  <T>Deletes when you leave the app.</T>
+                  <T>Deletes when you leave this chat.</T>
                 )
               }
             >

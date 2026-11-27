@@ -1342,7 +1342,7 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: SidebarThreadRowP
         }
         label={
           <>
-            <T>Ephemeral chat. Deletes when you leave.</T>
+            <T>Ephemeral chat. Deletes when you leave this chat.</T>
           </>
         }
       >

@@ -216,4 +216,16 @@ describe("withLaunchingThreads", () => {
     };
     expect(launch([started])[0]).toBe(started);
   });
+
+  it("preserves ephemeral on pending creation shells", () => {
+    const ephemeralCreation: QueuedThreadMessage = {
+      ...creation,
+      creation: {
+        ...creation.creation!,
+        ephemeral: true,
+      },
+    };
+    expect(pendingThreadCreationShell(ephemeralCreation)?.ephemeral).toBe(true);
+    expect(pendingThreadCreationShell(creation)?.ephemeral).toBe(false);
+  });
 });

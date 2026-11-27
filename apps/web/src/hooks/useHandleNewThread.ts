@@ -365,16 +365,15 @@ export function createNewThreadHandler(router: AnyRouter) {
             startFromOrigin: startFromOriginFor(defaultEnvMode.envMode),
           };
         }
-        if (workspaceContext || options?.ephemeral !== undefined || !isDraftAlreadyOpen) {
+        const nextEphemeral = options?.ephemeral ?? false;
+        const changesEphemeral =
+          options?.ephemeral !== undefined || emptyStoredDraftThread.ephemeral === true;
+        if (workspaceContext || changesEphemeral || !isDraftAlreadyOpen) {
           setDraftThreadContext(emptyStoredDraftThread.draftId, {
             ...workspaceContext,
             ...(!isDraftAlreadyOpen ? { runtimeMode: defaultRuntimeMode } : {}),
             ...(carryInteractionMode ? { interactionMode: carryInteractionMode } : {}),
-            ...(options?.ephemeral !== undefined
-              ? { ephemeral: options.ephemeral }
-              : !isDraftAlreadyOpen
-                ? { ephemeral: false }
-                : {}),
+            ...(changesEphemeral || !isDraftAlreadyOpen ? { ephemeral: nextEphemeral } : {}),
           });
         }
         const storedDraft = getComposerDraft(emptyStoredDraftThread.draftId);
@@ -400,11 +399,7 @@ export function createNewThreadHandler(router: AnyRouter) {
             ...workspaceContext,
             ...(!isDraftAlreadyOpen ? { runtimeMode: defaultRuntimeMode } : {}),
             ...(carryInteractionMode ? { interactionMode: carryInteractionMode } : {}),
-            ...(options?.ephemeral !== undefined
-              ? { ephemeral: options.ephemeral }
-              : !isDraftAlreadyOpen
-                ? { ephemeral: false }
-                : {}),
+            ...(changesEphemeral || !isDraftAlreadyOpen ? { ephemeral: nextEphemeral } : {}),
           },
         );
         const opened = {
@@ -436,16 +431,19 @@ export function createNewThreadHandler(router: AnyRouter) {
       latestActiveDraftThread.promotedTo == null &&
       !composerDraftHasUserContent(getComposerDraft(currentRouteTarget.draftId))
     ) {
+      const nextEphemeral = options?.ephemeral ?? false;
+      const changesEphemeral =
+        options?.ephemeral !== undefined || latestActiveDraftThread.ephemeral === true;
       if (
         hasBranchOption ||
         hasWorktreePathOption ||
         hasEnvModeOption ||
         hasStartFromOriginOption ||
-        options?.ephemeral !== undefined
+        changesEphemeral
       ) {
         setDraftThreadContext(currentRouteTarget.draftId, {
           ...pickExplicitWorkspaceOptions(options),
-          ...(options?.ephemeral !== undefined ? { ephemeral: options.ephemeral } : {}),
+          ...(changesEphemeral ? { ephemeral: nextEphemeral } : {}),
         });
       }
       setLogicalProjectDraftThreadId(logicalProjectKey, projectRef, currentRouteTarget.draftId, {
@@ -454,7 +452,7 @@ export function createNewThreadHandler(router: AnyRouter) {
         runtimeMode: latestActiveDraftThread.runtimeMode,
         interactionMode: latestActiveDraftThread.interactionMode,
         ...pickExplicitWorkspaceOptions(options),
-        ...(options?.ephemeral !== undefined ? { ephemeral: options.ephemeral } : {}),
+        ...(changesEphemeral ? { ephemeral: nextEphemeral } : {}),
       });
       seedPrompt(currentRouteTarget.draftId);
       return Promise.resolve({

@@ -58,6 +58,8 @@ import { AppText as Text } from "../../components/ui/AppText";
 import { threadContextsOutsideEnvironment } from "@zerocode/shared/composerContextReferences";
 
 import { makeTurnCommandMetadata } from "../../lib/commandMetadata";
+import { trackMobileEphemeralThread } from "../../lib/ephemeralThreads";
+import { scopeThreadRef } from "@zerocode/client-runtime/environment";
 
 import {
   clearComposerDraftContent,
@@ -724,6 +726,9 @@ export function NewTaskDraftScreen(props: {
       );
       return null;
     }
+    if (message.creation?.ephemeral === true) {
+      trackMobileEphemeralThread(scopeThreadRef(message.environmentId, message.threadId));
+    }
     promptInputRef.current?.blur();
     navigation.dispatch(
       CommonActions.setParams(
@@ -1056,7 +1061,15 @@ export function NewTaskDraftScreen(props: {
 
   if (!flow.selectedModel) {
     return (
-      <ThreadScreenFallback header={<AppBar title={gt("New thread")} onBack={goBack} />}>
+      <ThreadScreenFallback
+        header={
+          <AppBar
+            title={gt("New thread")}
+            subtitle={flow.ephemeral ? gt("Ephemeral") : undefined}
+            onBack={goBack}
+          />
+        }
+      >
         <KeyboardStickyView pointerEvents="box-none" style={{ flex: 1 }}>
           <View pointerEvents="box-none" className="flex-1 justify-end gap-3 p-4">
             {environmentControl}

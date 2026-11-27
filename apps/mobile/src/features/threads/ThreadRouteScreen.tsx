@@ -56,6 +56,10 @@ import { scopedThreadKey } from "../../lib/scopedEntities";
 import { useDelayedStatus } from "../../lib/useDelayedStatus";
 import { connectionRetryLabel } from "./floating-working-status";
 import { scopeThreadRef } from "@zerocode/client-runtime/environment";
+import {
+  deleteMobileEphemeralThreadOnLeave,
+  trackMobileEphemeralThread,
+} from "../../lib/ephemeralThreads";
 import { useThreadShell } from "../../state/entities";
 import { NATIVE_LIQUID_GLASS_SUPPORTED } from "../../native/native-glass";
 import { connectionTone } from "../connection/connectionTone";
@@ -263,6 +267,24 @@ function LiveThreadRouteController(props: ThreadRouteScreenProps) {
   const environmentIdRaw = firstRouteParam(params.environmentId);
   const threadIdRaw = firstRouteParam(params.threadId);
   const environmentId = environmentIdRaw ? EnvironmentId.make(environmentIdRaw) : null;
+  const primaryEnvironmentId =
+    !props.inspectorPresentation && environmentId !== null && threadIdRaw !== null
+      ? environmentId
+      : null;
+  const primaryThreadId =
+    !props.inspectorPresentation && environmentId !== null && threadIdRaw !== null
+      ? ThreadId.make(threadIdRaw)
+      : null;
+  // oxlint-disable-next-line zerocode/no-unreasoned-state-sync -- deletes an ephemeral thread when leaving it for another thread or closing the primary route
+  useEffect(() => {
+    if (primaryEnvironmentId === null || primaryThreadId === null) {
+      return;
+    }
+    const currentRef = scopeThreadRef(primaryEnvironmentId, primaryThreadId);
+    return () => {
+      deleteMobileEphemeralThreadOnLeave(currentRef);
+    };
+  }, [primaryEnvironmentId, primaryThreadId]);
   const routeEnvironmentRuntime = useRemoteEnvironmentRuntime(environmentId);
   const routeEnvironmentShellState = useEnvironmentShellReadiness(environmentId);
   const { onReconnectEnvironment } = useRemoteConnections();
@@ -945,6 +967,11 @@ function ThreadRouteContent(
     });
     localResendBusy.current = false;
     if (launched._tag !== "Success") return;
+    if (selectedThread.ephemeral === true) {
+      trackMobileEphemeralThread(
+        scopeThreadRef(selectedThread.environmentId, ThreadId.make(metadata.threadId)),
+      );
+    }
     navigation.dispatch(
       StackActions.replace("Thread", {
         environmentId: String(selectedThread.environmentId),
@@ -1016,7 +1043,13 @@ function ThreadRouteContent(
   const inspectorHeader = props.inspectorPresentation ? (
     <ThreadInspectorHeader
       title={selectedThread?.title ?? gt("Thread")}
-      subtitle={threadStatusLabel ?? undefined}
+      subtitle={
+        selectedThread?.ephemeral === true
+          ? threadStatusLabel
+            ? `${gt("Ephemeral")} · ${threadStatusLabel}`
+            : gt("Ephemeral")
+          : (threadStatusLabel ?? undefined)
+      }
       {...props.inspectorPresentation}
     />
   ) : null;
@@ -1055,6 +1088,7 @@ function ThreadRouteContent(
             <ThreadHeader
               title={selectedThread.title}
               subtitle={threadStatusLabel ?? headerSubtitle}
+              ephemeral={selectedThread.ephemeral === true}
               gitControls={threadGitControlProps}
               hasThreadCwd={selectedThreadCwd !== null}
               inspectorMode={inspectorMode}

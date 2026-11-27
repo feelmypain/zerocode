@@ -180,8 +180,31 @@ describe("buildThreadActionItems", () => {
     });
     expect(new Set(items.map((item) => item.value)).size).toBe(2);
     const remoteItem = items.find((item) => item.description === "Remote project · Current thread");
+    expect(remoteItem?.run).toBeDefined();
     await remoteItem?.run();
     expect(runThread).toHaveBeenCalledWith(remote);
+  });
+
+  it("excludes ephemeral threads until promoted with ephemeral: false", () => {
+    const normal = makeThread({ id: ThreadId.make("thread-normal"), title: "Normal thread" });
+    const ephemeral = makeThread({
+      id: ThreadId.make("thread-ephemeral"),
+      title: "Ephemeral thread",
+      ephemeral: true,
+    });
+    const promoted = makeThread({
+      id: ThreadId.make("thread-promoted"),
+      title: "Promoted thread",
+      ephemeral: false,
+    });
+    const items = buildThreadActionItems({
+      threads: [normal, ephemeral, promoted],
+      projectByKey: new Map([[`${LOCAL_ENVIRONMENT_ID}:${PROJECT_ID}`, { title: "Project" }]]),
+      icon: null,
+      runThread: async () => undefined,
+    });
+
+    expect(items.map((item) => item.title)).toEqual(["Normal thread", "Promoted thread"]);
   });
 
   it("ranks thread title matches ahead of contextual project-name matches", () => {
@@ -229,7 +252,10 @@ describe("buildThreadActionItems", () => {
       icon: null,
       run: async () => undefined,
     });
-    const projects = [action("new-thread-in:zerocode", "zerocode"), action("new-thread-in:web", "web")];
+    const projects = [
+      action("new-thread-in:zerocode", "zerocode"),
+      action("new-thread-in:web", "web"),
+    ];
     const newThreadIn = {
       kind: "submenu" as const,
       value: "action:new-thread-in",

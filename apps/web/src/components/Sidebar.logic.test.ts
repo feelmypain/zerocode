@@ -9,6 +9,7 @@ import { AsyncResult } from "effect/reactivity";
 import {
   ADD_PROJECT_SCOPE_ITEM_VALUE,
   filterSidebarProjectScopeItems,
+  filterSidebarV2VisibleThreads,
   shouldCreateNewThreadInCurrentProject,
   resolveScopedNewThreadProjectRef,
   deleteSelectedThreadEntries,
@@ -855,6 +856,63 @@ describe("sortScopedProjectsForSidebar", () => {
       "Archived-only project",
     ]);
   });
+
+  it("does not use ephemeral threads as project activity", () => {
+    const projects = [
+      makeProject({
+        id: ProjectId.make("project-visible"),
+        title: "Visible project",
+        updatedAt: "2026-03-09T10:01:00.000Z",
+      }),
+      makeProject({
+        id: ProjectId.make("project-ephemeral"),
+        title: "Ephemeral-only project",
+        updatedAt: "2026-03-09T10:00:00.000Z",
+      }),
+    ];
+    const threads = [
+      makeThread({
+        id: ThreadId.make("thread-visible"),
+        projectId: ProjectId.make("project-visible"),
+        updatedAt: "2026-03-09T10:02:00.000Z",
+      }),
+      makeThread({
+        id: ThreadId.make("thread-ephemeral"),
+        projectId: ProjectId.make("project-ephemeral"),
+        updatedAt: "2026-03-09T10:10:00.000Z",
+        ephemeral: true,
+      }),
+    ];
+
+    const sorted = sortScopedProjectsForSidebar(projects, threads, "updated_at");
+
+    expect(sorted.map((project) => project.title)).toEqual([
+      "Visible project",
+      "Ephemeral-only project",
+    ]);
+  });
+});
+
+describe("filterSidebarV2VisibleThreads", () => {
+  it("hides ephemeral threads until promoted with ephemeral: false", () => {
+    const normalThread = makeThread({ id: ThreadId.make("thread-normal") });
+    const ephemeralThread = makeThread({
+      id: ThreadId.make("thread-ephemeral"),
+      ephemeral: true,
+    });
+    const promotedThread = makeThread({
+      id: ThreadId.make("thread-promoted"),
+      ephemeral: false,
+    });
+
+    const visible = filterSidebarV2VisibleThreads(
+      [normalThread, ephemeralThread, promotedThread],
+      null,
+      new Set(),
+    );
+
+    expect(visible.map((thread) => thread.id)).toEqual([normalThread.id, promotedThread.id]);
+  });
 });
 
 describe("sortSidebarV2ProjectGroups", () => {
@@ -1662,7 +1720,9 @@ describe("sidebarFolderExpansionKeys", () => {
   it("honors a collapse the legacy sidebar saved under a member's cwd", () => {
     const keys = sidebarFolderExpansionKeys({
       projectKey: "github.com/feelmypain/zerocode",
-      memberProjects: [{ physicalProjectKey: "local:/code/zerocode", workspaceRoot: "/code/zerocode" }],
+      memberProjects: [
+        { physicalProjectKey: "local:/code/zerocode", workspaceRoot: "/code/zerocode" },
+      ],
     });
     const cwdKey = keys.at(-1)!;
 

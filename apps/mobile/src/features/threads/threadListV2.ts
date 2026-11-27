@@ -19,7 +19,11 @@ import {
   threadSearchMatchKey,
   threadSearchSubject,
 } from "@zerocode/client-runtime/state/thread-search";
-import { foldSearchQuery, rankSearchItems, scoreThreadSearch } from "@zerocode/shared/paletteSearch";
+import {
+  foldSearchQuery,
+  rankSearchItems,
+  scoreThreadSearch,
+} from "@zerocode/shared/paletteSearch";
 import {
   createInboxReturnTracker,
   isThreadWorking,
@@ -381,7 +385,13 @@ export function getThreadListV2OrderedSection(input: {
 }): EnvironmentThreadShell[] {
   const queuedThreadKeys = input.queuedThreadKeys?.size ? input.queuedThreadKeys : undefined;
   const threads = input.threads.filter((thread) => {
-    if (thread.archivedAt !== null || !isListedThreadLineage(thread.lineage)) return false;
+    if (
+      thread.archivedAt !== null ||
+      thread.ephemeral === true ||
+      !isListedThreadLineage(thread.lineage)
+    ) {
+      return false;
+    }
     if (
       (input.settlementEnvironmentIds?.has(thread.environmentId) ?? true) &&
       thread.settledOverride === "settled" &&
@@ -767,6 +777,7 @@ export function buildThreadListV2Items(input: {
   const listedThreads = input.threads.filter(
     (thread) =>
       thread.archivedAt === null &&
+      thread.ephemeral !== true &&
       isListedThreadLineage(thread.lineage) &&
       (input.environmentId === null || thread.environmentId === input.environmentId) &&
       (projectKeys === null || projectKeys.has(`${thread.environmentId}:${thread.projectId}`)),

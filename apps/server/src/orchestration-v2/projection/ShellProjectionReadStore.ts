@@ -1227,6 +1227,7 @@ export function makeShellProjectionReadStore(
       SELECT thread_id
       FROM orchestration_v2_projection_threads
       WHERE deleted_at IS NULL
+        AND json_valid(payload_json)
         AND json_extract(payload_json, '$.ephemeral') = 1
     `;
     return rows.map((row) => ThreadId.make(row.thread_id));

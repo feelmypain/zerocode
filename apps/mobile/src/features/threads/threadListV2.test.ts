@@ -1893,3 +1893,55 @@ describe("queued messages keep a settled thread active", () => {
     expect(layout.settledCount).toBe(1);
   });
 });
+
+describe("ephemeral threads list isolation", () => {
+  it("excludes ephemeral threads from project lists and sections until promoted", () => {
+    const normal = makeThread({ id: ThreadId.make("normal"), title: "Normal thread" });
+    const ephemeral = makeThread({
+      id: ThreadId.make("ephemeral"),
+      title: "Ephemeral scratch",
+      ephemeral: true,
+    });
+    const pinnedEphemeral = makeThread({
+      id: ThreadId.make("pinned-ephemeral"),
+      title: "Pinned ephemeral",
+      ephemeral: true,
+      pinnedAt: "2026-06-01T00:00:00.000Z",
+    });
+
+    const layout = buildThreadListV2Items({
+      threads: [normal, ephemeral, pinnedEphemeral],
+      environmentId: null,
+      searchQuery: "",
+      now: NOW,
+    });
+    expect(layout.items.map((item) => item.thread.id)).toEqual(["normal"]);
+
+    expect(
+      getThreadListV2OrderedSection({
+        threads: [normal, ephemeral, pinnedEphemeral],
+        section: "active",
+        now: NOW,
+      }).map((thread) => thread.id),
+    ).toEqual(["normal"]);
+    expect(
+      getThreadListV2OrderedSection({
+        threads: [normal, ephemeral, pinnedEphemeral],
+        section: "pinned",
+        now: NOW,
+      }),
+    ).toEqual([]);
+
+    const promoted = { ...ephemeral, ephemeral: false };
+    const afterPromotion = buildThreadListV2Items({
+      threads: [normal, promoted],
+      environmentId: null,
+      searchQuery: "",
+      now: NOW,
+    });
+    expect(afterPromotion.items.map((item) => item.thread.id).toSorted()).toEqual([
+      "ephemeral",
+      "normal",
+    ]);
+  });
+});

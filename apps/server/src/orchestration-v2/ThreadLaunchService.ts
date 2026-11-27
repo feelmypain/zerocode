@@ -106,6 +106,7 @@ export interface ThreadLaunchInput {
   readonly generateTitle?: boolean;
   /** The caller chose `title`, so a first message keeps it. */
   readonly titleRenamed?: boolean;
+  readonly ephemeral?: boolean;
   readonly modelSelection: ModelSelection;
   readonly runtimeMode: RuntimeMode;
   readonly interactionMode: ProviderInteractionMode;

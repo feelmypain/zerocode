@@ -208,6 +208,7 @@ export function pendingThreadCreationShell(
     pinnedAt: null,
     pinOrderKey: null,
     activeOrderKey: null,
+    ...(creation.ephemeral === true ? { ephemeral: true } : {}),
     deletedAt: null,
   });
 }

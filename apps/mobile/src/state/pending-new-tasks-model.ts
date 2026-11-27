@@ -134,7 +134,11 @@ export function buildPendingNewTasks(
   const tasks: PendingNewTask[] = [];
   for (const message of input.queuedMessages) {
     // Listing a creation already being sent would flash an "Unsent" row.
-    if (!message.creation || isQueuedCreationSending(message, input.sendGate)) {
+    if (
+      !message.creation ||
+      message.creation.ephemeral === true ||
+      isQueuedCreationSending(message, input.sendGate)
+    ) {
       continue;
     }
     tasks.push({

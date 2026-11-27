@@ -23,8 +23,10 @@ const testState = vi.hoisted(() => {
     readonly environmentId: string;
     readonly promotedTo: null;
     readonly threadId: string;
+    readonly ephemeral?: boolean;
   } | null = null;
   let openDraftRoute: { readonly kind: "draft"; readonly draftId: string } | null = null;
+  let openDraftEphemeral = false;
   const router = {
     state: {
       location: { href: "/" },
@@ -50,6 +52,7 @@ const testState = vi.hoisted(() => {
             createdAt: "2026-01-01T00:00:00.000Z",
             runtimeMode: "full-access",
             interactionMode: "default",
+            ...(openDraftEphemeral ? { ephemeral: true } : {}),
           },
     ),
     getDraftThread: vi.fn(() => null),
@@ -84,8 +87,9 @@ const testState = vi.hoisted(() => {
     get openDraftRoute() {
       return openDraftRoute;
     },
-    openEmptyDraft(draftId: string) {
+    openEmptyDraft(draftId: string, options?: { ephemeral?: boolean }) {
       openDraftRoute = { kind: "draft", draftId };
+      openDraftEphemeral = options?.ephemeral === true;
     },
     get targetSettings() {
       return targetSettings;
@@ -99,6 +103,7 @@ const testState = vi.hoisted(() => {
     ) {
       storedDraft = nextStoredDraft;
       openDraftRoute = null;
+      openDraftEphemeral = false;
       draftSession = {
         envMode: "local",
         worktreePath: null,
@@ -376,6 +381,52 @@ describe("useNewThreadHandler", () => {
     expect(testState.draftStore.setPrompt).toHaveBeenCalledWith(
       "draft-open",
       "Read the playbook. ",
+    );
+  });
+
+  it("resets ephemeral mode when opening a regular new thread on an already-open empty ephemeral draft", async () => {
+    testState.reset({
+      draftId: "draft-open",
+      environmentId: "environment-ssh",
+      promotedTo: null,
+      threadId: "thread-open",
+      ephemeral: true,
+    });
+    testState.openEmptyDraft("draft-open", { ephemeral: true });
+
+    await useNewThreadHandler()({
+      environmentId: "environment-ssh",
+      projectId: "project-remote",
+    } as never);
+
+    expect(testState.draftStore.setDraftThreadContext).toHaveBeenCalledWith(
+      "draft-open",
+      expect.objectContaining({ ephemeral: false }),
+    );
+    expect(testState.draftStore.setLogicalProjectDraftThreadId).toHaveBeenCalledWith(
+      "remote-project",
+      expect.anything(),
+      "draft-open",
+      expect.objectContaining({ ephemeral: false }),
+    );
+
+    testState.reset(null);
+    testState.openEmptyDraft("draft-open-active", { ephemeral: true });
+
+    await useNewThreadHandler()({
+      environmentId: "environment-ssh",
+      projectId: "project-remote",
+    } as never);
+
+    expect(testState.draftStore.setDraftThreadContext).toHaveBeenCalledWith(
+      "draft-open-active",
+      expect.objectContaining({ ephemeral: false }),
+    );
+    expect(testState.draftStore.setLogicalProjectDraftThreadId).toHaveBeenCalledWith(
+      "remote-project",
+      expect.anything(),
+      "draft-open-active",
+      expect.objectContaining({ ephemeral: false }),
     );
   });
 

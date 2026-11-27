@@ -151,6 +151,12 @@ import { useThreadDevicePreviewCount } from "../../state/device";
 import { ThreadBrowserFloat } from "../browser/ThreadBrowserFloat";
 import { useThreadServerBrowserTabCount } from "../../state/preview";
 import type { QueuedThreadMessage } from "../../state/thread-outbox-model";
+import { scopeThreadRef } from "@zerocode/client-runtime/environment";
+import {
+  markMobileEphemeralThreadKept,
+  unmarkMobileEphemeralThreadKept,
+  untrackMobileEphemeralThread,
+} from "../../lib/ephemeralThreads";
 import { scopedThreadKey } from "../../lib/scopedEntities";
 import {
   finishThreadMessageJump,
@@ -565,6 +571,19 @@ function ThreadDetailBody(
     AuthOrchestrationOperateScope,
   );
   const updateMetadata = useAtomCommand(threadEnvironment.updateMetadata, { reportFailure: false });
+  const handleKeepEphemeralThread = async () => {
+    const ref = scopeThreadRef(props.environmentId, props.selectedThread.id);
+    markMobileEphemeralThreadKept(ref);
+    const result = await updateMetadata({
+      environmentId: props.environmentId,
+      input: { threadId: props.selectedThread.id, ephemeral: false },
+    });
+    if (AsyncResult.isFailure(result)) {
+      unmarkMobileEphemeralThreadKept(ref);
+      return;
+    }
+    untrackMobileEphemeralThread(ref);
+  };
   const visitThread = useAtomCommand(threadEnvironment.visit, { reportFailure: false });
   const anyRunStop = useAtomValue(
     props.selectedThreadDetailRef === null
@@ -1953,10 +1972,7 @@ function ThreadDetailBody(
                         {...(!props.draftMode && props.selectedThread.ephemeral === true
                           ? {
                               onKeepEphemeral: () => {
-                                void updateMetadata({
-                                  environmentId: props.environmentId,
-                                  input: { threadId: props.selectedThread.id, ephemeral: false },
-                                });
+                                void handleKeepEphemeralThread();
                               },
                             }
                           : {})}

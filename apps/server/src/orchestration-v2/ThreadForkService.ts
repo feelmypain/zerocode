@@ -99,11 +99,12 @@ export const layer: Layer.Layer<ThreadForkServiceV2> = Layer.succeed(
           cause: forkableSourceRunStatusError(sourceRun),
         });
       }
-      // The remote parent delegated the source thread, not its forks.
-      // Nor is a fork a step of the run its source was one of.
+      // The remote parent delegated the source thread, not its forks; neither workflow membership
+      // nor ephemeral lifecycle transfers (side chats already cascade-delete with their parent).
       const {
         delegatedFrom: _delegatedFrom,
         workflowRun: _workflowRun,
+        ephemeral: _ephemeral,
         ...inherited
       } = input.sourceProjection.thread;
       const targetThread: OrchestrationV2AppThread = {

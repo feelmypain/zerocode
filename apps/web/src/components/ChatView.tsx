@@ -36,7 +36,12 @@ import {
 } from "../composerDraftStore";
 import { useNewThreadHandler } from "../hooks/useHandleNewThread";
 import { useStableCallback } from "../hooks/useStableCallback";
-import { untrackSessionEphemeralThread } from "../lib/ephemeralThreads";
+import {
+  markSessionEphemeralThreadKept,
+  trackSessionEphemeralThread,
+  unmarkSessionEphemeralThreadKept,
+} from "../lib/ephemeralThreads";
+import { readThreadShell } from "../state/entities";
 import { threadEnvironment } from "../state/threads";
 import { useOrchestrationCommand } from "../state/use-orchestration-command";
 import { stackedThreadToast, toastManager } from "./ui/toast";
@@ -833,26 +838,32 @@ export default function ChatView(props: ChatViewProps) {
   const keepEphemeralThreadStable = useStableCallback(() => {
     const targetRef = workspace.activeThreadRef;
     if (!route.isServerThread || !route.canOperateThread || targetRef === null) return;
+    markSessionEphemeralThreadKept(targetRef);
     void updateThreadMetadata({
       environmentId: targetRef.environmentId,
       input: { threadId: targetRef.threadId, ephemeral: false },
     }).then((result) => {
       if (result._tag === "Success") {
-        untrackSessionEphemeralThread(targetRef);
         toastManager.add({
           type: "success",
           title: gt("Chat saved"),
           description: gt("This conversation will stay in your history."),
         });
-      } else if (!isAtomCommandInterrupted(result)) {
-        toastManager.add(
-          stackedThreadToast({
-            type: "error",
-            title: gt("Failed to keep chat"),
-            description:
-              thrownErrorMessage(squashAtomCommandFailure(result), messages) ?? undefined,
-          }),
-        );
+      } else {
+        unmarkSessionEphemeralThreadKept(targetRef);
+        if (readThreadShell(targetRef)?.ephemeral === true) {
+          trackSessionEphemeralThread(targetRef);
+        }
+        if (!isAtomCommandInterrupted(result)) {
+          toastManager.add(
+            stackedThreadToast({
+              type: "error",
+              title: gt("Failed to keep chat"),
+              description:
+                thrownErrorMessage(squashAtomCommandFailure(result), messages) ?? undefined,
+            }),
+          );
+        }
       }
     });
   });

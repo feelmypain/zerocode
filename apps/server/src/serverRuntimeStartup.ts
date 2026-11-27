@@ -394,23 +394,31 @@ const runOrderedV2StartupPhases = Effect.fn("serverRuntimeStartup.runOrderedV2St
     RecoveryError,
     DelegationError,
     WorkerError,
+    EphemeralCleanupError,
     BootstrapError,
     ImportContext,
     RecoveryContext,
     DelegationContext,
     WorkerContext,
+    EphemeralCleanupContext,
     BootstrapContext,
   >(input: {
     readonly importLegacyShells: Effect.Effect<Import, ImportError, ImportContext>;
     readonly recover: Effect.Effect<Recovery, RecoveryError, RecoveryContext>;
     readonly recoverDelegatedTasks: Effect.Effect<void, DelegationError, DelegationContext>;
     readonly startEffectWorker: Effect.Effect<void, WorkerError, WorkerContext>;
+    readonly cleanupEphemeralThreads: Effect.Effect<
+      void,
+      EphemeralCleanupError,
+      EphemeralCleanupContext
+    >;
     readonly autoBootstrap: Effect.Effect<Bootstrap, BootstrapError, BootstrapContext>;
   }) {
     yield* input.importLegacyShells;
     const recovery = yield* input.recover;
     yield* input.recoverDelegatedTasks;
     yield* input.startEffectWorker;
+    yield* input.cleanupEphemeralThreads;
     const bootstrap = yield* input.autoBootstrap;
     return { recovery, bootstrap } as const;
   },
@@ -542,6 +550,22 @@ const make = Effect.fn("serverRuntimeStartup.make")(function* (options?: Startup
           workerFiberRef: effectWorkerFiber,
         }),
       ),
+      cleanupEphemeralThreads: runStartupPhase(
+        "orchestration-v2.ephemeral-threads.cleanup",
+        threadManagement.deleteEphemeralThreads().pipe(
+          Effect.tap((summary) =>
+            summary.deletedCount === 0
+              ? Effect.void
+              : Effect.logInfo("Cleaned up leftover ephemeral threads on startup", summary),
+          ),
+          Effect.catch((error) =>
+            Effect.logWarning("Failed to clean up ephemeral threads on startup", {
+              error: error.message,
+            }),
+          ),
+          Effect.asVoid,
+        ),
+      ),
       autoBootstrap: (serverConfig.autoBootstrapProjectFromCwd
         ? runStartupPhase(
             "welcome.autobootstrap",
@@ -553,21 +577,6 @@ const make = Effect.fn("serverRuntimeStartup.make")(function* (options?: Startup
       ).pipe(Effect.map((targets): AutoBootstrapWelcomeTargets => targets)),
     });
     yield* Effect.logInfo("V2 orchestration recovery completed", recovery);
-    yield* runStartupPhase(
-      "orchestration-v2.ephemeral-threads.cleanup",
-      threadManagement.deleteEphemeralThreads().pipe(
-        Effect.tap((summary) =>
-          summary.deletedCount === 0
-            ? Effect.void
-            : Effect.logInfo("Cleaned up leftover ephemeral threads on startup", summary),
-        ),
-        Effect.catch((error) =>
-          Effect.logWarning("Failed to clean up ephemeral threads on startup", {
-            error: error.message,
-          }),
-        ),
-      ),
-    );
     // Runs after activation: the status check fetches every enabled project's
     // remote, and awaiting it here held command readiness for that long.
     const projectStore = yield* ProjectStore.ProjectStoreV2;

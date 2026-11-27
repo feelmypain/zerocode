@@ -136,7 +136,9 @@ export function useThreadListV2(input: {
     () =>
       buildThreadListV2Items({
         pendingOrder: input.pendingOrder,
-        threads: threads.filter((thread) => thread.archivedAt === null),
+        threads: threads.filter(
+          (thread) => thread.archivedAt === null && thread.ephemeral !== true,
+        ),
         environmentId: input.environmentId,
         projectRefs: input.projectRefs,
         searchQuery: input.searchQuery,
@@ -158,6 +160,7 @@ export function useThreadListV2(input: {
           threads.filter(
             (thread) =>
               thread.archivedAt === null &&
+              thread.ephemeral !== true &&
               scopes.some(
                 (scope) =>
                   scope.environmentId === thread.environmentId &&

@@ -960,6 +960,7 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
     markThreadUnread,
     archiveThread,
     deleteThread,
+    keepEphemeralThread,
   } = useThreadActions();
   const updateThreadMetadata = useOrchestrationCommand(threadEnvironment.updateMetadata, {
     reportFailure: false,
@@ -2731,6 +2732,7 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
                     }
                   : null,
               isPinned,
+              isEphemeral: thread.ephemeral === true,
               isSettled,
               autoSettleEnabled: thread.autoSettleDisabledAt == null,
               isSnoozed,
@@ -2776,6 +2778,26 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
           return;
         }
         switch (clicked.value) {
+          case "keep-ephemeral": {
+            const result = await keepEphemeralThread(threadRef);
+            if (result._tag === "Success") {
+              toastManager.add({
+                type: "success",
+                title: gt("Chat saved"),
+                description: gt("This conversation will stay in your history."),
+              });
+            } else if (!isAtomCommandInterrupted(result)) {
+              const error = squashAtomCommandFailure(result);
+              toastManager.add(
+                stackedThreadToast({
+                  type: "error",
+                  title: gt("Failed to keep chat"),
+                  description: thrownErrorMessage(error, m) ?? gt("An error occurred."),
+                }),
+              );
+            }
+            return;
+          }
           case "filter-by-project":
             if (threadProjectGroup) {
               setProjectScopeKeys(

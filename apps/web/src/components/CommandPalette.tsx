@@ -472,6 +472,7 @@ function OpenCommandPaletteDialog(props: {
   const delegatedUnderParent = useDelegatedUnderParent();
   const threads = useVisibleThreadShells().filter(
     (thread) =>
+      thread.ephemeral !== true &&
       !isShownUnderParent(
         { environmentId: thread.environmentId, threadId: thread.id },
         thread.lineage,
@@ -1341,7 +1342,7 @@ function OpenCommandPaletteDialog(props: {
           </T>
         ),
         searchTitle: gt("New ephemeral chat in {project}", { project: activeProjectTitle }),
-        description: gt("Deletes when you leave the app"),
+        description: gt("Deletes when you leave this chat"),
         icon: <MessageCircleDashedIcon className={ITEM_ICON_CLASS} />,
         run: async () => {
           await startNewThreadFromContext(

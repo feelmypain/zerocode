@@ -141,6 +141,7 @@ it.effect("parks automatic pull until activation without delaying command readin
       Layer.mock(ProjectService.ProjectService)({ snapshot: Effect.succeed(snapshot) }),
       Layer.mock(ThreadManagement.ThreadManagementService)({
         countThreads: () => Effect.succeed(0),
+        deleteEphemeralThreads: () => Effect.succeed({ deletedCount: 0 }),
       }),
       Layer.mock(ThreadLaunch.ThreadLaunchService)({}),
       Layer.mock(ServiceLauncherClient.ServiceLauncherClient)({

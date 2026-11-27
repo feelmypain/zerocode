@@ -66,6 +66,7 @@ import { type ChatMessage, DEFAULT_INTERACTION_MODE } from "../../types";
 import { recordPromptSent } from "../GitHubStarPrompt";
 import { stackedThreadToast, toastManager } from "../ui/toast";
 import {
+  flushPendingEphemeralLeaveDeletion,
   trackSessionEphemeralThread,
   untrackSessionEphemeralThread,
 } from "../../lib/ephemeralThreads";
@@ -1460,8 +1461,14 @@ export function useComposerSend(input: ComposerSendInput) {
     const sentDraftThreadRef = isLocalDraftThread
       ? scopeThreadRef(environmentId, threadIdForSend)
       : null;
+    const createdEphemeralThreadRef =
+      sentDraftThreadRef !== null && draftThread?.ephemeral === true ? sentDraftThreadRef : null;
+    const isEphemeralThread = isLocalDraftThread
+      ? draftThread?.ephemeral === true
+      : activeThread.ephemeral === true;
     // Keep new-thread flows from reusing this draft while attachments and worktree setup settle.
     if (sentDraftThreadRef) markPromotedDraftThreadByRef(sentDraftThreadRef);
+    if (createdEphemeralThreadRef) trackSessionEphemeralThread(createdEphemeralThreadRef);
     clearComposerDraftContent(composerDraftTarget);
     // The prompt ref and cursor belong to the thread on screen, which may no longer be this one.
     if (currentRouteThreadKeyRef.current === routeThreadKey) {
@@ -1569,7 +1576,7 @@ export function useComposerSend(input: ComposerSendInput) {
             }
           : undefined;
       const backgroundThreadRef =
-        submissionIntent === "background" && isLocalDraftThread
+        submissionIntent === "background" && isLocalDraftThread && !isEphemeralThread
           ? scopeThreadRef(environmentId, threadIdForSend)
           : null;
       // Read the live session, not the render snapshot: the draft is finalized away once the
@@ -1580,13 +1587,6 @@ export function useComposerSend(input: ComposerSendInput) {
           )
         : null;
       if (backgroundThreadRef) beginBackgroundDraftSubmissionByRef(backgroundThreadRef);
-      const createdEphemeralThreadRef =
-        isLocalDraftThread && draftThread?.ephemeral
-          ? scopeThreadRef(environmentId, threadIdForSend)
-          : null;
-      if (createdEphemeralThreadRef) {
-        trackSessionEphemeralThread(createdEphemeralThreadRef);
-      }
       const startPromise = startThreadTurn({
         environmentId,
         input: {
@@ -1637,12 +1637,12 @@ export function useComposerSend(input: ComposerSendInput) {
       }
       const startResult = await startPromise;
       if (startResult._tag === "Failure") {
-        if (createdEphemeralThreadRef && readThreadShell(createdEphemeralThreadRef) === null) {
-          untrackSessionEphemeralThread(createdEphemeralThreadRef);
-        }
         failure = startResult;
       } else {
         turnStartSucceeded = true;
+        if (createdEphemeralThreadRef) {
+          flushPendingEphemeralLeaveDeletion(createdEphemeralThreadRef);
+        }
         if (checkoutPullRequestUrl) {
           linkCheckoutPullRequest(
             scopeThreadRef(environmentId, threadIdForSend),
@@ -1683,6 +1683,7 @@ export function useComposerSend(input: ComposerSendInput) {
           }
         } else if (
           submissionIntent === "background" &&
+          !isEphemeralThread &&
           currentRouteThreadKeyRef.current === routeThreadKey
         ) {
           handleNewThreadInActiveProject();
@@ -1692,6 +1693,9 @@ export function useComposerSend(input: ComposerSendInput) {
     }
 
     if (failure !== null) {
+      if (createdEphemeralThreadRef && readThreadShell(createdEphemeralThreadRef) === null) {
+        untrackSessionEphemeralThread(createdEphemeralThreadRef);
+      }
       if (isLocalDraftThread && draftId && draftThread) {
         restoreFailedDraftThread(
           draftId,

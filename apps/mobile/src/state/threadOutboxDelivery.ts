@@ -35,7 +35,9 @@ import { AsyncResult, Atom } from "effect/reactivity";
 import { msg } from "gt-react-native";
 import { m } from "../i18n/messages";
 
+import { scopeThreadRef } from "@zerocode/client-runtime/environment";
 import { createDebugLogger } from "../lib/debugLog";
+import { flushPendingMobileEphemeralDeletion } from "../lib/ephemeralThreads";
 import type { DraftComposerAttachment } from "../lib/composerImages";
 import { scopedThreadKey } from "../lib/scopedEntities";
 import { buildProjectThreadStartTurnInput } from "../lib/projectThreadStartTurn";
@@ -1233,6 +1235,9 @@ export function createThreadOutboxDelivery(): {
       return yield* recoverEditedCreationAfterDelivery(persistedMessage);
     }
     if (outcome !== "removed") return yield* retryDelivery;
+    flushPendingMobileEphemeralDeletion(
+      scopeThreadRef(persistedMessage.environmentId, persistedMessage.threadId),
+    );
   });
 
   /** The head of one thread's queue, as the inputs stand now. */

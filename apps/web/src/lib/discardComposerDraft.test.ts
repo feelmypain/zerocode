@@ -135,4 +135,19 @@ describe("discardComposerDraft", () => {
     expect(restored.previewUrl).toBe(preview.image.previewUrl);
     expect(await (await fetch(restored.previewUrl)).text()).toBe("image bytes");
   });
+
+  it("silently clears a draft session and releases previews without showing an undo notice", async () => {
+    using preview = imagePreview();
+    const store = useComposerDraftStore.getState();
+    store.setProjectDraftThreadId(projectRef, draftId, { ephemeral: true });
+    store.setPrompt(draftId, "ephemeral draft");
+    store.addImage(draftId, preview.image);
+
+    discardComposerDraft(draftId, { silent: true });
+
+    expect(useComposerDraftStore.getState().getDraftSession(draftId)).toBeNull();
+    expect(useComposerDraftStore.getState().getComposerDraft(draftId)).toBeNull();
+    expect(showThreadUndoNotice).not.toHaveBeenCalled();
+    await expect(fetch(preview.image.previewUrl)).rejects.toThrow();
+  });
 });

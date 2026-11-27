@@ -15,7 +15,10 @@ import { m } from "../i18n/messages";
 import * as ThreadUndo from "@zerocode/client-runtime/state/thread-undo";
 import { releaseDraftAttachments } from "./attachmentUploadQueue";
 
-export function discardComposerDraft(target: ComposerThreadTarget): void {
+export function discardComposerDraft(
+  target: ComposerThreadTarget,
+  options?: { readonly silent?: boolean },
+): void {
   const store = useComposerDraftStore.getState();
   const key = resolveComposerDraftKey(store, target);
   const draft = key === null ? undefined : store.draftsByThreadKey[key];
@@ -27,7 +30,6 @@ export function discardComposerDraft(target: ComposerThreadTarget): void {
     .map(([logicalProjectKey]) => logicalProjectKey);
   const discardsSession = typeof target === "string";
 
-  const claim = ThreadUndo.begin("discard", key);
   // The composer may key attachments by the target or by its resolved draft id; a late
   // compression under either would recreate the draft.
   cancelPreparingComposerImages(composerTargetKey(target));
@@ -48,6 +50,13 @@ export function discardComposerDraft(target: ComposerThreadTarget): void {
       }
     }
   };
+
+  if (options?.silent) {
+    releaseDiscardedDraft();
+    return;
+  }
+
+  const claim = ThreadUndo.begin("discard", key);
 
   showThreadUndoNotice({
     action: "Discarded",
