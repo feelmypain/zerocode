@@ -92,6 +92,7 @@ export function useThreadActionMenu(input: {
     setThreadAutoSettle,
     archiveThread,
     deleteThread,
+    keepEphemeralThread,
     markThreadUnread,
     turnThreadIntoProject,
   } = useThreadActions();
@@ -141,6 +142,7 @@ export function useThreadActionMenu(input: {
       branch: thread.branch ?? null,
       projectFilter: null,
       isPinned: thread.pinnedAt != null,
+      isEphemeral: thread.ephemeral === true,
       isSettled: supports.settlement && thread.settledOverride === "settled",
       autoSettleEnabled: thread.autoSettleDisabledAt == null,
       isSnoozed: supports.snooze && effectiveSnoozed(thread, { now: now.toISOString() }),
@@ -198,6 +200,19 @@ export function useThreadActionMenu(input: {
         case "find":
           onFind?.(threadRef);
           return;
+        case "keep-ephemeral": {
+          const result = await keepEphemeralThread(threadRef);
+          if (result._tag === "Success") {
+            toastManager.add({
+              type: "success",
+              title: m(msg("Chat saved")),
+              description: m(msg("This conversation will stay in your history.")),
+            });
+          } else if (!isAtomCommandInterrupted(result)) {
+            failureToast(m(msg("Failed to keep chat")), squashAtomCommandFailure(result));
+          }
+          return;
+        }
         case "project-settings": {
           const project = projects.find(
             (candidate) =>

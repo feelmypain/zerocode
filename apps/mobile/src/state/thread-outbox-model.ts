@@ -49,6 +49,7 @@ const QueuedThreadCreationSchema = Schema.Struct({
   pullRequestReference: Schema.optional(Schema.String),
   repositories: Schema.optional(Schema.Array(Schema.String)),
   startsFromRepositoryDefaults: Schema.optional(Schema.Boolean),
+  ephemeral: Schema.optional(Schema.Boolean),
 });
 
 export const QueuedThreadMessageSchema = Schema.Struct({
@@ -87,6 +88,7 @@ export interface QueuedThreadCreation {
   readonly repositories?: ReadonlyArray<string>;
   /** The project folder is no Git repository, so a new worktree needs no base branch. */
   readonly startsFromRepositoryDefaults?: boolean;
+  readonly ephemeral?: boolean;
 }
 
 export interface QueuedThreadMessage {

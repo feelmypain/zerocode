@@ -71,6 +71,7 @@ import {
   FolderGit2Icon,
   FolderIcon,
   FolderPlusIcon,
+  MessageCircleDashedIcon,
   MessageSquareDashedIcon,
   LinkIcon,
   MessageSquareIcon,
@@ -1316,6 +1317,42 @@ function OpenCommandPaletteDialog(props: {
             defaultProjectRef,
             handleNewThread,
           });
+        },
+      });
+      actionItems.push({
+        kind: "action",
+        value: "action:new-ephemeral-chat",
+        searchTerms: [
+          "ephemeral",
+          "temporary",
+          "temp",
+          "incognito",
+          "ephemere",
+          "éphémère",
+          "quick",
+          "chat",
+        ],
+        title: (
+          <T>
+            New ephemeral chat in{" "}
+            <span className="font-semibold">
+              <Var>{activeProjectTitle}</Var>
+            </span>
+          </T>
+        ),
+        searchTitle: gt("New ephemeral chat in {project}", { project: activeProjectTitle }),
+        description: gt("Deletes when you leave the app"),
+        icon: <MessageCircleDashedIcon className={ITEM_ICON_CLASS} />,
+        run: async () => {
+          await startNewThreadFromContext(
+            {
+              activeDraftThread,
+              activeThread: activeThread ?? undefined,
+              defaultProjectRef,
+              handleNewThread,
+            },
+            { ephemeral: true },
+          );
         },
       });
     }

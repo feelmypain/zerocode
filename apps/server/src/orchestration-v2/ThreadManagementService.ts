@@ -470,6 +470,10 @@ export interface ThreadManagementServiceShape {
     >,
   ) => Effect.Effect<OrchestrationV2ThreadShellSnapshot, Orchestrator.OrchestratorV2Error>;
   readonly listActiveSubagentThreadIds: Orchestrator.OrchestratorV2["Service"]["listActiveSubagentThreadIds"];
+  readonly listEphemeralThreadIds: Orchestrator.OrchestratorV2["Service"]["listEphemeralThreadIds"];
+  readonly deleteEphemeralThreads: (
+    threadIds?: ReadonlyArray<ThreadId>,
+  ) => Effect.Effect<{ readonly deletedCount: number }, Orchestrator.OrchestratorV2Error>;
   readonly countThreads: Orchestrator.OrchestratorV2["Service"]["countThreads"];
   readonly listActiveShellIndex: Orchestrator.OrchestratorV2["Service"]["listActiveShellIndex"];
   readonly listOlderSettledThreads: Orchestrator.OrchestratorV2["Service"]["listOlderSettledThreads"];
@@ -1909,6 +1913,56 @@ const make = Effect.gen(function* () {
     if (failures[0] !== undefined) return yield* failures[0];
   });
 
+  const deleteEphemeralThreads = Effect.fn("ThreadManagementService.deleteEphemeralThreads")(
+    function* (threadIds?: ReadonlyArray<ThreadId>) {
+      const ephemeralIds = yield* orchestrator.listEphemeralThreadIds();
+      if (ephemeralIds.length === 0) {
+        return { deletedCount: 0 };
+      }
+      const targetIds =
+        threadIds === undefined
+          ? ephemeralIds
+          : (() => {
+              const ephemeralSet = new Set(ephemeralIds);
+              const uniqueTargets: Array<ThreadId> = [];
+              const seen = new Set<ThreadId>();
+              for (const threadId of threadIds) {
+                if (ephemeralSet.has(threadId) && !seen.has(threadId)) {
+                  seen.add(threadId);
+                  uniqueTargets.push(threadId);
+                }
+              }
+              return uniqueTargets;
+            })();
+      if (targetIds.length === 0) {
+        return { deletedCount: 0 };
+      }
+      const nowMs = DateTime.toEpochMillis(yield* DateTime.now);
+      let deletedCount = 0;
+      for (const [index, threadId] of targetIds.entries()) {
+        const deleted = yield* orchestrator
+          .dispatch({
+            type: "thread.delete",
+            commandId: CommandId.make(`ephemeral-cleanup:${nowMs}:${index}:${threadId}`),
+            threadId,
+          })
+          .pipe(
+            Effect.as(true),
+            Effect.catch((error) =>
+              Effect.logWarning("Failed to delete ephemeral thread during cleanup", {
+                threadId,
+                error: error.message,
+              }).pipe(Effect.as(false)),
+            ),
+          );
+        if (deleted) {
+          deletedCount += 1;
+        }
+      }
+      return { deletedCount };
+    },
+  );
+
   return ThreadManagementService.of({
     ensureLegacyTranscript,
     searchThreadStream: (input) =>
@@ -1984,6 +2038,8 @@ const make = Effect.gen(function* () {
     getAgentAwarenessSnapshot: orchestrator.getAgentAwarenessSnapshot,
     getShellSnapshot: orchestrator.getShellSnapshot,
     listActiveSubagentThreadIds: orchestrator.listActiveSubagentThreadIds,
+    listEphemeralThreadIds: orchestrator.listEphemeralThreadIds,
+    deleteEphemeralThreads,
     countThreads: orchestrator.countThreads,
     listActiveShellIndex: orchestrator.listActiveShellIndex,
     listOlderSettledThreads: orchestrator.listOlderSettledThreads,

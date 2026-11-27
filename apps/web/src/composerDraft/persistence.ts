@@ -797,10 +797,11 @@ export function partializeComposerDraftStoreState(
     Object.entries(state.draftThreadsByThreadKey)
       .filter(
         ([threadKey, draftThread]) =>
-          mappedDraftKeys.has(threadKey) ||
-          isDraftThreadPromoting(draftThread) ||
-          composerDraftHasUserContent(state.draftsByThreadKey[threadKey]) ||
-          draftThreadHasOpenPreview(draftThread),
+          draftThread.ephemeral !== true &&
+          (mappedDraftKeys.has(threadKey) ||
+            isDraftThreadPromoting(draftThread) ||
+            composerDraftHasUserContent(state.draftsByThreadKey[threadKey]) ||
+            draftThreadHasOpenPreview(draftThread)),
       )
       .map(([threadKey]) => threadKey),
   );
@@ -914,11 +915,16 @@ export function partializeComposerDraftStoreState(
       ...(worktreeRepositories ? { worktreeRepositories: [...worktreeRepositories] } : {}),
     };
   }
+  const persistedLogicalProjectDraftThreadKeyByLogicalProjectKey = Object.fromEntries(
+    Object.entries(state.logicalProjectDraftThreadKeyByLogicalProjectKey).filter(
+      ([, threadKey]) => state.draftThreadsByThreadKey[threadKey]?.ephemeral !== true,
+    ),
+  );
   return {
     draftsByThreadKey: persistedDraftsByThreadKey,
     draftThreadsByThreadKey: persistedDraftThreadsByThreadKey,
     logicalProjectDraftThreadKeyByLogicalProjectKey:
-      state.logicalProjectDraftThreadKeyByLogicalProjectKey,
+      persistedLogicalProjectDraftThreadKeyByLogicalProjectKey,
     stickyModelSelectionByProvider: compactModelSelectionByProvider(
       state.stickyModelSelectionByProvider,
     ),

@@ -169,6 +169,7 @@ type NewTaskFlowContextValue = {
   readonly prompt: string;
   readonly attachments: ReadonlyArray<DraftComposerAttachment>;
   readonly submitting: boolean;
+  readonly ephemeral: boolean;
   readonly branchesLoading: boolean;
   readonly availableBranches: ReadonlyArray<VcsRef>;
   readonly currentCheckoutBranchName: string | null;
@@ -225,6 +226,7 @@ type NewTaskFlowContextValue = {
   readonly removeAttachment: (imageId: string) => void;
   readonly clearAttachments: () => void;
   readonly setSubmitting: (value: boolean) => void;
+  readonly setEphemeral: (value: boolean) => void;
   readonly loadBranches: () => void;
   readonly setRuntimeMode: (value: RuntimeMode) => void;
   readonly setSelectedModelOptions: (
@@ -308,6 +310,7 @@ export function NewTaskFlowProvider(
     projectKey: selectedProjectKey,
     draftKey: activeDraftKey,
     submitting,
+    ephemeral,
     expandedProvider,
   } = flowState;
   // Continuations read the flow at use time, with the route's draft applied.
@@ -847,6 +850,7 @@ export function NewTaskFlowProvider(
           ? { startFromOrigin: true }
           : {}),
         ...(mode === "worktree" ? worktreeCreation(workspaceSelection.repositories) : {}),
+        ...(readFlow().ephemeral ? { ephemeral: true } : {}),
       },
       createdAt: metadata.createdAt,
     };
@@ -937,6 +941,7 @@ export function NewTaskFlowProvider(
     prompt,
     attachments,
     submitting,
+    ephemeral,
     branchesLoading,
     availableBranches,
     currentCheckoutBranchName,
@@ -979,6 +984,7 @@ export function NewTaskFlowProvider(
       }
       updateFlow({ submitting: value });
     },
+    setEphemeral: (value: boolean) => updateFlow({ ephemeral: value }),
     loadBranches,
     setRuntimeMode,
     setSelectedModelOptions,

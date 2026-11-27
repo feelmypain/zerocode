@@ -395,6 +395,8 @@ const composerDraftStore = create<ComposerDraftStoreState>()(
                   ? undefined
                   : existing.worktreeRepositories
                 : (options.worktreeRepositories ?? undefined);
+            const nextEphemeral =
+              options.ephemeral === undefined ? (existing.ephemeral ?? false) : options.ephemeral;
             const nextDraftThread: DraftThreadState = {
               threadId: existing.threadId,
               environmentId: nextProjectRef.environmentId,
@@ -418,6 +420,7 @@ const composerDraftStore = create<ComposerDraftStoreState>()(
               envMode:
                 options.envMode ?? (nextWorktreePath ? "worktree" : (existing.envMode ?? "local")),
               startFromOrigin: nextStartFromOrigin,
+              ...(nextEphemeral ? { ephemeral: true } : {}),
               ...(checkoutPullRequest ? { checkoutPullRequest } : {}),
               ...(worktreeRepositories ? { worktreeRepositories } : {}),
               promotedTo: existing.promotedTo ?? null,
@@ -435,6 +438,7 @@ const composerDraftStore = create<ComposerDraftStoreState>()(
               nextDraftThread.worktreePath === existing.worktreePath &&
               nextDraftThread.envMode === existing.envMode &&
               nextDraftThread.startFromOrigin === existing.startFromOrigin &&
+              Boolean(nextDraftThread.ephemeral) === Boolean(existing.ephemeral) &&
               checkoutPullRequestsEqual(
                 nextDraftThread.checkoutPullRequest,
                 existing.checkoutPullRequest,

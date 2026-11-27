@@ -1,5 +1,10 @@
 import { type LegendListRef } from "@legendapp/list/react";
-import { scopeThreadRef } from "@zerocode/client-runtime/environment";
+import { scopeProjectRef, scopeThreadRef } from "@zerocode/client-runtime/environment";
+import { thrownErrorMessage } from "@zerocode/client-runtime/errors";
+import {
+  isAtomCommandInterrupted,
+  squashAtomCommandFailure,
+} from "@zerocode/client-runtime/state/runtime";
 import { queuedRunEditBlockedReason } from "@zerocode/client-runtime/queued-run-edit";
 import type { ThreadStructure } from "@zerocode/client-runtime/state/shell";
 import {
@@ -27,7 +32,14 @@ import {
   type ComposerFileAttachment,
   type ComposerImageAttachment,
   DraftId,
+  useComposerDraftStore,
 } from "../composerDraftStore";
+import { useNewThreadHandler } from "../hooks/useHandleNewThread";
+import { useStableCallback } from "../hooks/useStableCallback";
+import { untrackSessionEphemeralThread } from "../lib/ephemeralThreads";
+import { threadEnvironment } from "../state/threads";
+import { useOrchestrationCommand } from "../state/use-orchestration-command";
+import { stackedThreadToast, toastManager } from "./ui/toast";
 import { useComposerHandleContext } from "../composerHandleContext";
 import { FileMetadataThreadProvider } from "../hooks/FileMetadataThreadProvider";
 import { shortcutLabelForCommand } from "../keybindings";
@@ -814,6 +826,55 @@ export default function ChatView(props: ChatViewProps) {
     );
 
   // Above the early return, where React Compiler can cache it for the side chat pane.
+  const handleNewThread = useNewThreadHandler();
+  const updateThreadMetadata = useOrchestrationCommand(threadEnvironment.updateMetadata, {
+    reportFailure: false,
+  });
+  const keepEphemeralThreadStable = useStableCallback(() => {
+    const targetRef = workspace.activeThreadRef;
+    if (!route.isServerThread || !route.canOperateThread || targetRef === null) return;
+    void updateThreadMetadata({
+      environmentId: targetRef.environmentId,
+      input: { threadId: targetRef.threadId, ephemeral: false },
+    }).then((result) => {
+      if (result._tag === "Success") {
+        untrackSessionEphemeralThread(targetRef);
+        toastManager.add({
+          type: "success",
+          title: gt("Chat saved"),
+          description: gt("This conversation will stay in your history."),
+        });
+      } else if (!isAtomCommandInterrupted(result)) {
+        toastManager.add(
+          stackedThreadToast({
+            type: "error",
+            title: gt("Failed to keep chat"),
+            description:
+              thrownErrorMessage(squashAtomCommandFailure(result), messages) ?? undefined,
+          }),
+        );
+      }
+    });
+  });
+  const toggleEphemeralStable = useStableCallback(() => {
+    if (route.isServerThread) {
+      if (route.activeThread?.ephemeral) {
+        keepEphemeralThreadStable();
+        return;
+      }
+      const project = workspace.activeProject;
+      if (!project) return;
+      void handleNewThread(scopeProjectRef(project.environmentId, project.id), {
+        ephemeral: true,
+      });
+      return;
+    }
+    if (draftId !== null) {
+      useComposerDraftStore.getState().setDraftThreadContext(draftId, {
+        ephemeral: !(route.draftThread?.ephemeral === true),
+      });
+    }
+  });
   const sideChatParentPanel = {
     hostRef: scopeThreadRef(environmentId, threadId),
     openToolDiff: panels.onOpenToolDiffStable,
@@ -921,6 +982,7 @@ export default function ChatView(props: ChatViewProps) {
     sideChatAvailable: panels.sideChat.available,
     sideChatDisabledReason: panels.sideChatDisabledReason,
     onFreshSession: freshSessionCommandAvailable ? armFreshSessionStable : undefined,
+    onToggleEphemeral: embedded ? undefined : toggleEphemeralStable,
     onUsageLimitsCommand:
       timeline.usageLimitsOffered &&
       timeline.usageLimitsKey !== null &&
@@ -1033,12 +1095,17 @@ export default function ChatView(props: ChatViewProps) {
               activeThreadId: activeThread.id,
               isServerThread: route.isServerThread,
               activeThreadTitle: activeThread.title,
+              activeThreadEphemeral: activeThread.ephemeral === true,
               activeThreadLinkOrigin: route.activeThreadShell?.linkOrigin?.label ?? null,
               activeProject: workspace.activeProject ?? null,
               parentThreadLink: route.headerParentThreadLink,
               onOpenThread: lifecycle.onOpenRelatedThreadStable,
               rightPanelOpen: panels.inlineRightPanelOwnsTitleBar,
               onNewThreadInProject: workspace.handleNewThreadInActiveProjectStable,
+              onKeepEphemeralThread:
+                route.isServerThread && activeThread.ephemeral === true
+                  ? keepEphemeralThreadStable
+                  : undefined,
               ...(workspace.activeDraftLogicalProjectKey
                 ? { onOpenProjectSettings: workspace.handleOpenDraftProjectSettingsStable }
                 : {}),

@@ -294,6 +294,8 @@ export interface DraftSessionState {
   worktreePath: string | null;
   envMode: DraftThreadEnvMode;
   startFromOrigin: boolean;
+  /** Temporary chat draft: excluded from localStorage persistence and deleted when leaving the app. */
+  ephemeral?: boolean;
   /** Linked to the thread when the draft is sent on this branch. */
   checkoutPullRequest?: DraftCheckoutPullRequest;
   /**
@@ -386,6 +388,7 @@ export interface ComposerDraftStoreState {
       environmentSelection?: "auto" | "manual";
       loadBalancedEnvironmentId?: EnvironmentId | null;
       checkoutPullRequest?: DraftCheckoutPullRequest | null;
+      ephemeral?: boolean;
     },
   ) => void;
   setProjectDraftThreadId: (
@@ -403,6 +406,7 @@ export interface ComposerDraftStoreState {
       environmentSelection?: "auto" | "manual";
       loadBalancedEnvironmentId?: EnvironmentId | null;
       checkoutPullRequest?: DraftCheckoutPullRequest | null;
+      ephemeral?: boolean;
     },
   ) => void;
   setDraftThreadContext: (
@@ -420,6 +424,7 @@ export interface ComposerDraftStoreState {
       loadBalancedEnvironmentId?: EnvironmentId | null;
       checkoutPullRequest?: DraftCheckoutPullRequest | null;
       worktreeRepositories?: ReadonlyArray<string> | null;
+      ephemeral?: boolean;
     },
   ) => void;
   clearProjectDraftThreadId: (projectRef: ScopedProjectRef) => void;

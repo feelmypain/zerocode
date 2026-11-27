@@ -6,6 +6,7 @@ import { m, type MessageResolver } from "../i18n/messages";
 
 export type ThreadActionMenuId =
   | "find"
+  | "keep-ephemeral"
   | "new-thread-on-branch"
   | "filter-by-project"
   | "turn-into-project"
@@ -106,6 +107,7 @@ export interface ThreadActionMenuState {
     readonly isActive: boolean;
   } | null;
   readonly isPinned: boolean;
+  readonly isEphemeral?: boolean;
   readonly isSettled: boolean;
   readonly autoSettleEnabled: boolean;
   readonly isSnoozed: boolean;
@@ -160,6 +162,15 @@ export function buildThreadActionMenuItems(
   resolve: MessageResolver = m,
 ): ReadonlyArray<ContextMenuItem<ThreadActionMenuId>> {
   const items: ReadonlyArray<ContextMenuItem<ThreadActionMenuId>> = [
+    ...(state.isEphemeral
+      ? [
+          {
+            id: "keep-ephemeral" as const,
+            label: resolve(msg("Keep chat")),
+            icon: "bookmark-plus",
+          },
+        ]
+      : []),
     ...(state.canFind
       ? [{ id: "find" as const, label: resolve(msg("Find in thread")), icon: "text-search" }]
       : []),

@@ -1034,6 +1034,22 @@ export function NewTaskDraftScreen(props: {
         </View>
       ) : null}
       {viewportHeight < SHORT_DRAFT_VIEWPORT_HEIGHT ? contextControls : null}
+      <View className="flex-row flex-wrap items-center gap-x-1 px-2">
+        <ComposerInlineControl
+          accessibilityHint={
+            flow.ephemeral
+              ? gt("Turns off ephemeral mode so this chat stays in your history")
+              : gt("Deletes this chat when you leave the app")
+          }
+          accessibilityLabel={flow.ephemeral ? gt("Ephemeral chat enabled") : gt("Ephemeral chat")}
+          disabled={isComposerInteractionLocked}
+          icon="circle.dashed"
+          label={gt("Ephemeral")}
+          selected={flow.ephemeral}
+          showChevron={false}
+          onPress={() => flow.setEphemeral(!flow.ephemeral)}
+        />
+      </View>
       {flow.canChooseWorkspace ? workspaceControls : null}
     </View>
   );
@@ -1081,6 +1097,7 @@ export function NewTaskDraftScreen(props: {
       branch: flow.selectedBranchName,
       worktreePath: flow.selectedWorktreePath,
       createdAt: creationMetadata.createdAt,
+      ephemeral: flow.ephemeral,
     },
     m,
   );

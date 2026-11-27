@@ -49,6 +49,7 @@ import {
 import { type ComposerCommandItem } from "./ComposerCommandMenu";
 import { type ComposerCommandMenuControllerHandle } from "./ComposerCommandMenuController";
 import { ComposerControlsBar } from "./ComposerControlsBar";
+import { ComposerEphemeralButton } from "./ComposerEphemeralButton";
 import { ComposerSurface } from "./ComposerSurface";
 import { hasProviderSetup } from "./ProviderStatusBanner";
 import { readPromptUltrathink } from "./TraitsPicker";
@@ -126,6 +127,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
     sideChatAvailable,
     sideChatDisabledReason,
     onFreshSession,
+    onToggleEphemeral,
     environmentUnavailable,
     activePendingApproval: incomingPendingApproval,
     pendingApprovals,
@@ -1158,6 +1160,16 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
   const composerAttachButton = showComposerAttachAction ? (
     <ComposerAttachButton onOpenPicker={() => composerAttachInputRef.current?.click()} />
   ) : null;
+  const isEphemeralThread = activeThread?.ephemeral === true;
+  const composerEphemeralButton =
+    onToggleEphemeral !== undefined && !isComposerApprovalState && !activePendingProgress ? (
+      <ComposerEphemeralButton
+        active={isEphemeralThread}
+        mode={routeKind}
+        disabled={routeKind === "server" && isEphemeralThread && !canOperateThread}
+        onToggle={onToggleEphemeral}
+      />
+    ) : null;
 
   return (
     <form
@@ -1259,7 +1271,11 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
         <ComposerSurface.Main
           ref={composerMainSurfaceRef}
           data-inline-resting-controls="true"
-          className={composerProviderState.composerFrameClassName}
+          data-ephemeral-composer={isEphemeralThread ? "true" : "false"}
+          className={cn(
+            composerProviderState.composerFrameClassName,
+            isEphemeralThread && "border-dashed border-muted-foreground/45",
+          )}
         >
           <div
             ref={composerSurfaceRef}
@@ -1414,6 +1430,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
               dictationTakesFooter={dictationTakesFooter}
               isComposerPrimaryActionsCompact={isComposerPrimaryActionsCompact}
               composerAttachButton={composerAttachButton}
+              composerEphemeralButton={composerEphemeralButton}
               composerControls={composerControls}
               attachExpandedComposerControls={attachExpandedComposerControls}
               showInlineRestingControls={showInlineRestingControls}

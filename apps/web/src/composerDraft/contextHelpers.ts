@@ -350,6 +350,7 @@ export function createDraftThreadState(
     environmentSelection?: "auto" | "manual";
     loadBalancedEnvironmentId?: EnvironmentId | null;
     checkoutPullRequest?: DraftCheckoutPullRequest | null;
+    ephemeral?: boolean;
   },
 ): DraftThreadState {
   const projectChanged =
@@ -379,6 +380,8 @@ export function createDraftThreadState(
     options?.checkoutPullRequest,
     projectChanged,
   );
+  const nextEphemeral =
+    options?.ephemeral === undefined ? (existingThread?.ephemeral ?? false) : options.ephemeral;
   return {
     threadId,
     environmentId: projectRef.environmentId,
@@ -404,6 +407,7 @@ export function createDraftThreadState(
       options?.envMode ?? (nextWorktreePath ? "worktree" : (existingThread?.envMode ?? "local")),
     startFromOrigin: nextStartFromOrigin,
     ...(checkoutPullRequest ? { checkoutPullRequest } : {}),
+    ...(nextEphemeral ? { ephemeral: true } : {}),
     ...(!projectChanged && existingThread?.worktreeRepositories !== undefined
       ? { worktreeRepositories: existingThread.worktreeRepositories }
       : {}),
@@ -430,6 +434,7 @@ export function draftThreadsEqual(
     left.worktreePath === right.worktreePath &&
     left.envMode === right.envMode &&
     left.startFromOrigin === right.startFromOrigin &&
+    Boolean(left.ephemeral) === Boolean(right.ephemeral) &&
     checkoutPullRequestsEqual(left.checkoutPullRequest, right.checkoutPullRequest) &&
     worktreeRepositoriesEqual(left.worktreeRepositories, right.worktreeRepositories) &&
     scopedThreadRefsEqual(left.promotedTo, right.promotedTo)

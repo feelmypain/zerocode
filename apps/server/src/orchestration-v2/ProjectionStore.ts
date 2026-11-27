@@ -244,6 +244,10 @@ export interface ProjectionStoreV2Shape {
     ReadonlyArray<ThreadId>,
     ProjectionStoreV2Error
   >;
+  readonly listEphemeralThreadIds: () => Effect.Effect<
+    ReadonlyArray<ThreadId>,
+    ProjectionStoreV2Error
+  >;
   /** Threads that are not deleted, archived ones included. */
   readonly countThreads: () => Effect.Effect<number, ProjectionStoreV2Error>;
   /** Every active thread, in shell order. */
@@ -1565,6 +1569,7 @@ export const layer: Layer.Layer<ProjectionStoreV2, never, SqlClient.SqlClient> =
       getShellSnapshot: readOnReader(shellReads.getShellSnapshot),
       getPullRequestSnapshot: readOnReader(shellReads.getPullRequestSnapshot),
       listActiveSubagentThreadIds: readOnReader(shellReads.listActiveSubagentThreadIds),
+      listEphemeralThreadIds: readOnReader(shellReads.listEphemeralThreadIds),
       countThreads: readOnReader(shellReads.countThreads),
       listActiveShellIndex: readOnReader(shellReads.listActiveShellIndex),
       listActiveThreads: readOnReader(shellReads.listActiveThreads),

@@ -29,6 +29,7 @@ export interface NewTaskFlowState {
   readonly projectKey: string | null;
   readonly draftKey: string | null;
   readonly submitting: boolean;
+  readonly ephemeral: boolean;
   readonly expandedProvider: string | null;
 }
 
@@ -37,6 +38,7 @@ export const INITIAL_NEW_TASK_FLOW_STATE: NewTaskFlowState = {
   projectKey: null,
   draftKey: null,
   submitting: false,
+  ephemeral: false,
   expandedProvider: null,
 };
 

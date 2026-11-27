@@ -140,6 +140,8 @@ export interface ChatComposerProps {
   sideChatDisabledReason?: string | null;
   /** Arms a fresh session for the next message; absent where `/clear` is unavailable. */
   onFreshSession?: (() => void) | undefined;
+  /** Toggles ephemeral mode on drafts, promotes ephemeral server chats, or opens a fresh ephemeral draft. */
+  onToggleEphemeral?: (() => void) | undefined;
   environmentUnavailable: {
     readonly label: string;
     readonly connection: EnvironmentConnectionPresentation;

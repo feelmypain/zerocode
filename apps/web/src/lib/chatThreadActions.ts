@@ -26,6 +26,7 @@ interface NewThreadHandler {
       worktreePath?: string | null;
       envMode?: DraftThreadEnvMode;
       startFromOrigin?: boolean;
+      ephemeral?: boolean;
     },
   ): Promise<unknown>;
 }
@@ -103,12 +104,16 @@ export function resolveThreadActionProjectRef(
 
 export async function startNewThreadFromContext(
   context: ChatThreadActionContext,
+  options?: { readonly ephemeral?: boolean },
 ): Promise<boolean> {
   const projectRef = resolveThreadActionProjectRef(context);
   if (!projectRef) {
     return false;
   }
 
-  await context.handleNewThread(projectRef);
+  await context.handleNewThread(
+    projectRef,
+    options?.ephemeral === undefined ? undefined : { ephemeral: options.ephemeral },
+  );
   return true;
 }

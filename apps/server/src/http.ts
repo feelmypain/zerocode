@@ -2,7 +2,9 @@ import * as Mime from "effect/http/Mime";
 import {
   AuthOrchestrationOperateScope,
   AuthOrchestrationReadScope,
+  EPHEMERAL_THREADS_CLEANUP_PATH,
   EnvironmentHttpApi,
+  ThreadId,
 } from "@zerocode/contracts";
 import { isDevProxiedPath } from "@zerocode/shared/devProxy";
 import {
@@ -54,6 +56,7 @@ import {
   validateAttachmentUploadToken,
 } from "./assets/AttachmentUpload.ts";
 import * as BrowserTraceCollector from "./observability/BrowserTraceCollector.ts";
+import * as ThreadManagement from "./orchestration-v2/ThreadManagementService.ts";
 import * as EnvironmentAuth from "./auth/EnvironmentAuth.ts";
 import {
   annotateEnvironmentRequest,
@@ -429,6 +432,43 @@ class DecodeOtlpTraceRecordsError extends Schema.TaggedError<DecodeOtlpTraceReco
   "DecodeOtlpTraceRecordsError",
   { cause: Schema.Defect() },
 ) {}
+
+const EphemeralThreadsCleanupBody = Schema.Struct({
+  threadIds: Schema.Array(ThreadId).check(Schema.isMaxLength(256)),
+});
+const decodeEphemeralThreadsCleanupBody = Schema.decodeUnknownEffect(EphemeralThreadsCleanupBody);
+
+export const layerEphemeralThreadsCleanupRoute = HttpRouter.add(
+  "POST",
+  EPHEMERAL_THREADS_CLEANUP_PATH,
+  Effect.gen(function* () {
+    yield* authenticateRawRouteWithScope(AuthOrchestrationOperateScope);
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const rawBody = yield* request.json.pipe(Effect.option);
+    if (Option.isNone(rawBody)) {
+      return HttpServerResponse.text("Bad Request", { status: 400 });
+    }
+    const decoded = yield* decodeEphemeralThreadsCleanupBody(rawBody.value).pipe(Effect.option);
+    if (Option.isNone(decoded)) {
+      return HttpServerResponse.text("Bad Request", { status: 400 });
+    }
+    const threadManagement = yield* ThreadManagement.ThreadManagementService;
+    yield* threadManagement.deleteEphemeralThreads(decoded.value.threadIds).pipe(
+      Effect.catch((error) =>
+        Effect.logWarning("Failed to clean up ephemeral threads", {
+          error: error.message,
+        }),
+      ),
+    );
+    return HttpServerResponse.empty({ status: 204 });
+  }).pipe(
+    Effect.catchTags({
+      EnvironmentAuthInvalidError: HttpServerRespondable.toResponse,
+      EnvironmentInternalError: HttpServerRespondable.toResponse,
+      EnvironmentScopeRequiredError: HttpServerRespondable.toResponse,
+    }),
+  ),
+);
 
 // Tracing once-per-second renderer exports would create more spans than it forwards.
 export const layerOtlpTracesProxyRoute = HttpRouter.add(

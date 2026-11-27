@@ -422,6 +422,7 @@ const make = Effect.fn("serverRuntimeStartup.make")(function* (options?: Startup
   const legacyV1ThreadImporter = yield* LegacyV1ThreadImporter.LegacyV1ThreadImporter;
   const providerRuntimeRecovery = yield* ProviderRuntimeRecovery.ProviderRuntimeRecoveryService;
   const orchestrator = yield* Orchestrator.OrchestratorV2;
+  const threadManagement = yield* ThreadManagement.ThreadManagementService;
   const providerSessions = yield* ProviderSessionManager.ProviderSessionManagerV2;
   const agentAwarenessRelay = yield* AgentAwarenessRelay.AgentAwarenessRelay;
   const lifecycleEvents = yield* ServerLifecycleEvents.ServerLifecycleEvents;
@@ -453,6 +454,16 @@ const make = Effect.fn("serverRuntimeStartup.make")(function* (options?: Startup
       );
       const reconciliation = yield* providerRuntimeRecovery.reconcile("shutdown");
       yield* Effect.logInfo("V2 orchestration shutdown reconciliation completed", reconciliation);
+      const ephemeralCleanup = yield* threadManagement.deleteEphemeralThreads().pipe(
+        Effect.catch((error) =>
+          Effect.logWarning("Failed to clean up ephemeral threads on shutdown", {
+            error: error.message,
+          }).pipe(Effect.as({ deletedCount: 0 })),
+        ),
+      );
+      if (ephemeralCleanup.deletedCount > 0) {
+        yield* Effect.logInfo("Cleaned up ephemeral threads on shutdown", ephemeralCleanup);
+      }
     }).pipe(
       Effect.withSpan("server.shutdown"),
       Effect.catchCause((cause) =>
@@ -542,6 +553,21 @@ const make = Effect.fn("serverRuntimeStartup.make")(function* (options?: Startup
       ).pipe(Effect.map((targets): AutoBootstrapWelcomeTargets => targets)),
     });
     yield* Effect.logInfo("V2 orchestration recovery completed", recovery);
+    yield* runStartupPhase(
+      "orchestration-v2.ephemeral-threads.cleanup",
+      threadManagement.deleteEphemeralThreads().pipe(
+        Effect.tap((summary) =>
+          summary.deletedCount === 0
+            ? Effect.void
+            : Effect.logInfo("Cleaned up leftover ephemeral threads on startup", summary),
+        ),
+        Effect.catch((error) =>
+          Effect.logWarning("Failed to clean up ephemeral threads on startup", {
+            error: error.message,
+          }),
+        ),
+      ),
+    );
     // Runs after activation: the status check fetches every enabled project's
     // remote, and awaiting it here held command readiness for that long.
     const projectStore = yield* ProjectStore.ProjectStoreV2;

@@ -488,6 +488,7 @@ export function buildLocalDraftThread(
     archivedAt: null,
     settledOverride: null,
     settledAt: null,
+    ...(draftThread.ephemeral ? { ephemeral: true } : {}),
     deletedAt: null,
   });
 }

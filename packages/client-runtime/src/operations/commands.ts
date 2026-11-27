@@ -95,6 +95,7 @@ export interface CreateThreadInput extends CommandMetadata {
   readonly threadId: ThreadId;
   readonly projectId: ProjectId;
   readonly title: string;
+  readonly ephemeral?: boolean;
   readonly modelSelection: ModelSelection;
   readonly runtimeMode: RuntimeMode;
   readonly interactionMode: ProviderInteractionMode;
@@ -157,6 +158,7 @@ export interface UpdateThreadMetadataInput extends ThreadCommandInput {
   readonly worktreePath?: string | null;
   readonly regenerateTitle?: boolean;
   readonly linkedPullRequest?: ThreadLinkedPullRequest | null;
+  readonly ephemeral?: boolean;
   readonly expectedEmpty?: boolean;
 }
 
@@ -172,6 +174,7 @@ interface StartThreadBootstrap {
   readonly createThread?: {
     readonly projectId: ProjectId;
     readonly title: string;
+    readonly ephemeral?: boolean;
     readonly modelSelection: ModelSelection;
     readonly runtimeMode: RuntimeMode;
     readonly interactionMode: ProviderInteractionMode;
@@ -519,6 +522,7 @@ export const createThread = Effect.fn("EnvironmentCommands.createThread")(functi
     threadId: input.threadId,
     projectId: input.projectId,
     title: input.title,
+    ...(input.ephemeral === true ? { ephemeral: true } : {}),
     modelSelection: input.modelSelection,
     runtimeMode: input.runtimeMode,
     interactionMode: input.interactionMode,
@@ -734,7 +738,8 @@ export const updateThreadMetadata = Effect.fn("EnvironmentCommands.updateThreadM
       input.worktreePath !== undefined ||
       input.regenerateTitle !== undefined ||
       input.linkedPullRequest !== undefined ||
-      input.limitRecovery !== undefined
+      input.limitRecovery !== undefined ||
+      input.ephemeral !== undefined
     ) {
       result = yield* dispatch({
         type: "thread.metadata.update",
@@ -749,6 +754,7 @@ export const updateThreadMetadata = Effect.fn("EnvironmentCommands.updateThreadM
         ...(input.linkedPullRequest === undefined
           ? {}
           : { linkedPullRequest: input.linkedPullRequest }),
+        ...(input.ephemeral === undefined ? {} : { ephemeral: input.ephemeral }),
       });
     }
     if (input.modelSelection !== undefined) {
@@ -843,6 +849,7 @@ export const startThreadTurn = Effect.fn("EnvironmentCommands.startThreadTurn")(
       projectId: thread.projectId,
       title: input.titleSeed ?? thread.title,
       generateTitle: input.titleSeed !== undefined,
+      ...(bootstrap?.ephemeral === true ? { ephemeral: true } : {}),
       modelSelection: input.modelSelection ?? thread.modelSelection,
       runtimeMode: input.runtimeMode,
       interactionMode: input.interactionMode,

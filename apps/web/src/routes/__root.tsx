@@ -48,6 +48,7 @@ import { SnapShotCoordinator } from "../components/desktop/SnapShotCoordinator";
 import { DesktopAppActivationCoordinator } from "../components/desktop/DesktopAppActivationCoordinator";
 import { DesktopWebLinkCoordinator } from "../components/desktop/DesktopWebLinkCoordinator";
 import { RunningThreadKeepAlive } from "../components/desktop/RunningThreadKeepAlive";
+import { EphemeralThreadsCleanupCoordinator } from "../lib/ephemeralThreads";
 import { ReopenClosedViewShortcut } from "../components/ReopenClosedViewShortcut";
 import { ProjectCloneToastCoordinator } from "../components/ProjectCloneToastCoordinator";
 import { ConnectDeviceApprovalCoordinator } from "../components/ConnectDeviceApprovalCoordinator";
@@ -372,6 +373,7 @@ function RootRouteBranch() {
         </>
       ) : null}
       {isElectron ? <RunningThreadKeepAlive /> : null}
+      <EphemeralThreadsCleanupCoordinator />
       <LazyRelayClientInstallDialogHost />
       <LazyConnectOnboardingDialogHost />
       <LazySshPasswordPromptDialogHost />

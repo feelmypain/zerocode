@@ -1522,6 +1522,7 @@ const make = Effect.gen(function* () {
                 commandId: input.commandId,
                 threadId: candidateThreadId,
                 expectedEmpty: true,
+                ...(input.ephemeral === undefined ? {} : { ephemeral: input.ephemeral }),
               })
             : threads.dispatch({
                 type: "thread.create",
@@ -1530,6 +1531,7 @@ const make = Effect.gen(function* () {
                 projectId: input.projectId,
                 title: input.title,
                 ...(input.titleRenamed === true ? { titleRenamed: true } : {}),
+                ...(input.ephemeral === true ? { ephemeral: true } : {}),
                 modelSelection: input.modelSelection,
                 runtimeMode: input.runtimeMode,
                 interactionMode: input.interactionMode,

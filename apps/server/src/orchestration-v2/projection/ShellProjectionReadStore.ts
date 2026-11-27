@@ -1222,6 +1222,16 @@ export function makeShellProjectionReadStore(
     Effect.mapError(shellSnapshotReadError),
   );
 
+  const listEphemeralThreadIds = Effect.fn("ProjectionStore.listEphemeralThreadIds")(function* () {
+    const rows = yield* sql<{ readonly thread_id: string }>`
+      SELECT thread_id
+      FROM orchestration_v2_projection_threads
+      WHERE deleted_at IS NULL
+        AND json_extract(payload_json, '$.ephemeral') = 1
+    `;
+    return rows.map((row) => ThreadId.make(row.thread_id));
+  }, Effect.mapError(shellSnapshotReadError));
+
   const countThreads = Effect.fn("ProjectionStore.countThreads")(function* () {
     const rows = yield* sql<{ readonly count: number }>`
       SELECT COUNT(*) AS count FROM orchestration_v2_projection_threads WHERE deleted_at IS NULL
@@ -1606,6 +1616,7 @@ export function makeShellProjectionReadStore(
     getShellSnapshot,
     getPullRequestSnapshot,
     listActiveSubagentThreadIds,
+    listEphemeralThreadIds,
     countThreads,
     listActiveShellIndex,
     listActiveThreads,

@@ -266,6 +266,10 @@ export interface OrchestratorV2Shape {
     ReadonlyArray<ThreadId>,
     OrchestratorV2Error
   >;
+  readonly listEphemeralThreadIds: () => Effect.Effect<
+    ReadonlyArray<ThreadId>,
+    OrchestratorV2Error
+  >;
   readonly countThreads: () => Effect.Effect<number, OrchestratorV2Error>;
   readonly listActiveShellIndex: () => Effect.Effect<
     ReadonlyArray<ActiveShellIndexEntry>,
@@ -2122,6 +2126,9 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
           .pipe(Effect.mapError(shellProjectionError));
       },
     ),
+    listEphemeralThreadIds: Effect.fn("OrchestratorV2.listEphemeralThreadIds")(function () {
+      return projectionStore.listEphemeralThreadIds().pipe(Effect.mapError(shellProjectionError));
+    }),
     countThreads: Effect.fn("OrchestratorV2.countThreads")(function () {
       return projectionStore.countThreads().pipe(Effect.mapError(shellProjectionError));
     }),

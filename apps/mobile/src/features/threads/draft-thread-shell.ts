@@ -23,6 +23,7 @@ export function draftThreadShell(
     readonly branch: string | null;
     readonly worktreePath: string | null;
     readonly createdAt: string;
+    readonly ephemeral?: boolean;
   },
   resolve: MessageResolver = m,
 ) {
@@ -65,6 +66,7 @@ export function draftThreadShell(
     pinnedAt: null,
     pinOrderKey: null,
     activeOrderKey: null,
+    ...(input.ephemeral ? { ephemeral: true } : {}),
     deletedAt: null,
   });
 }

@@ -1354,6 +1354,7 @@ export function threadShellFromProjection(
     titleRegeneration: projection.thread.titleRegeneration ?? null,
     lastTitleRegeneration: projection.thread.lastTitleRegeneration ?? null,
     limitRecovery: projection.thread.limitRecovery ?? null,
+    ...(projection.thread.ephemeral === true ? { ephemeral: true } : {}),
     deletedAt: projection.thread.deletedAt,
   };
 }
@@ -1661,6 +1662,7 @@ export function shellFromState(input: {
     titleRegeneration: input.state.thread.titleRegeneration ?? null,
     lastTitleRegeneration: input.state.thread.lastTitleRegeneration ?? null,
     limitRecovery: input.state.thread.limitRecovery ?? null,
+    ...(input.state.thread.ephemeral === true ? { ephemeral: true } : {}),
     deletedAt: input.state.thread.deletedAt,
   };
 }

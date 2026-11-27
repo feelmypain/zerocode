@@ -50,6 +50,7 @@ import {
   ClockIcon,
   FolderGit2Icon,
   GitBranchIcon,
+  MessageCircleDashedIcon,
   MessageCircleQuestionIcon,
   PinIcon,
   PinOffIcon,
@@ -1328,6 +1329,34 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: SidebarThreadRowP
       />
     </SharedTooltipTrigger>
   ) : null;
+  const ephemeralIndicator =
+    thread.ephemeral === true ? (
+      <SharedTooltipTrigger
+        render={
+          <span
+            role="img"
+            aria-label={gt("Ephemeral chat")}
+            data-testid={`sidebar-ephemeral-indicator-${thread.id}`}
+            className="inline-flex shrink-0 items-center"
+          />
+        }
+        label={
+          <>
+            <T>Ephemeral chat. Deletes when you leave.</T>
+          </>
+        }
+      >
+        <MessageCircleDashedIcon
+          aria-hidden="true"
+          className={cn(
+            "size-3 shrink-0",
+            isMutedSettled
+              ? "text-secondary-label group-hover/sidebar-row:text-muted-foreground/75 group-focus-within/sidebar-row:text-muted-foreground/75"
+              : "text-muted-foreground/75",
+          )}
+        />
+      </SharedTooltipTrigger>
+    ) : null;
   const showPin =
     props.isPinned && (!sortable?.isDragging || (props.dragOverPinned && props.dropVerb === null));
   const pinIndicator = showPin ? (
@@ -1493,6 +1522,7 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: SidebarThreadRowP
               </span>
             )}
             {draftIndicator}
+            {ephemeralIndicator}
             {title}
             {multiline ? titleLineIcons : null}
             {pinIndicator}
@@ -1693,6 +1723,7 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: SidebarThreadRowP
         >
           <div className="flex h-5 min-w-0 items-center gap-1.5">
             {draftIndicator}
+            {ephemeralIndicator}
             {props.project ? (
               <ProjectFavicon project={props.project} className="size-4 shrink-0" />
             ) : null}

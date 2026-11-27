@@ -3020,3 +3020,56 @@ describe("composerDraftStore checkout pull request", () => {
     }
   });
 });
+
+describe("composerDraftStore ephemeral drafts", () => {
+  beforeEach(() => {
+    resetComposerDraftStore();
+  });
+
+  afterEach(() => {
+    resetComposerDraftStore();
+  });
+
+  it("excludes ephemeral drafts and their prompt content from persisted storage until turned off", () => {
+    const projectId = ProjectId.make("project-ephemeral-draft");
+    const projectRef = scopeProjectRef(TEST_ENVIRONMENT_ID, projectId);
+    const ephemeralDraftId = DraftId.make("draft-ephemeral-1");
+    const permanentDraftId = DraftId.make("draft-permanent-1");
+    const store = useComposerDraftStore.getState;
+
+    store().setLogicalProjectDraftThreadId(
+      scopedProjectKey(projectRef),
+      projectRef,
+      ephemeralDraftId,
+      { threadId: ThreadId.make("thread-ephemeral-1"), ephemeral: true },
+    );
+    store().setPrompt(ephemeralDraftId, "Quick throwaway question");
+
+    store().setProjectDraftThreadId(
+      scopeProjectRef(TEST_ENVIRONMENT_ID, ProjectId.make("project-permanent")),
+      permanentDraftId,
+      { threadId: ThreadId.make("thread-permanent-1") },
+    );
+    store().setPrompt(permanentDraftId, "Saved draft question");
+
+    const persistedWhileEphemeral = partializeComposerDraftStoreState(store());
+    expect(persistedWhileEphemeral.draftThreadsByThreadKey[ephemeralDraftId]).toBeUndefined();
+    expect(persistedWhileEphemeral.draftsByThreadKey[ephemeralDraftId]).toBeUndefined();
+    expect(
+      persistedWhileEphemeral.logicalProjectDraftThreadKeyByLogicalProjectKey[
+        scopedProjectKey(projectRef)
+      ],
+    ).toBeUndefined();
+    expect(persistedWhileEphemeral.draftThreadsByThreadKey[permanentDraftId]).toBeDefined();
+    expect(persistedWhileEphemeral.draftsByThreadKey[permanentDraftId]?.prompt).toBe(
+      "Saved draft question",
+    );
+
+    store().setDraftThreadContext(ephemeralDraftId, { ephemeral: false });
+    const persistedAfterDisable = partializeComposerDraftStoreState(store());
+    expect(persistedAfterDisable.draftThreadsByThreadKey[ephemeralDraftId]).toBeDefined();
+    expect(persistedAfterDisable.draftsByThreadKey[ephemeralDraftId]?.prompt).toBe(
+      "Quick throwaway question",
+    );
+  });
+});

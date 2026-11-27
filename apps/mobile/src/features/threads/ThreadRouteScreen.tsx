@@ -939,6 +939,7 @@ function ThreadRouteContent(
         branch: null,
         worktreePath: null,
         startFromOrigin: false,
+        ...(selectedThread.ephemeral ? { ephemeral: true } : {}),
         worktreeBranchName: "",
       }),
     });

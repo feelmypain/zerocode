@@ -40,6 +40,7 @@ export interface ProjectThreadStartTurnSpec {
   /** Tracked repositories a new worktree takes, by path; absent leaves the choice to the server. */
   readonly worktreeRepositories?: ReadonlyArray<string>;
   readonly worktreeBranchName: string;
+  readonly ephemeral?: boolean;
 }
 
 export function buildProjectThreadStartTurnInput(spec: ProjectThreadStartTurnSpec) {
@@ -67,6 +68,7 @@ export function buildProjectThreadStartTurnInput(spec: ProjectThreadStartTurnSpe
       createThread: {
         projectId: spec.projectId,
         title,
+        ...(spec.ephemeral ? { ephemeral: true } : {}),
         modelSelection: spec.modelSelection,
         runtimeMode: spec.runtimeMode,
         interactionMode: spec.interactionMode,

@@ -37,6 +37,7 @@ import { vcsEnvironment } from "../state/vcs";
 import { useNewThreadHandler } from "./useHandleNewThread";
 import { refreshArchivedThreadsForEnvironment } from "../lib/archivedThreadsState";
 import { releaseComposerDraftUploads } from "../lib/composerDraftUploads";
+import { untrackSessionEphemeralThread } from "../lib/ephemeralThreads";
 import { announce } from "../lib/announce";
 import { m } from "../i18n/messages";
 import { readLocalApi } from "../localApi";
@@ -310,6 +311,9 @@ export function useThreadActions() {
   const deleteThreadMutation = useOrchestrationCommand(threadEnvironment.delete, {
     reportFailure: false,
   });
+  const updateThreadMetadataMutation = useOrchestrationCommand(threadEnvironment.updateMetadata, {
+    reportFailure: false,
+  });
   const settleThreadMutation = useOrchestrationCommand(
     threadEnvironment.settle,
     { reportFailure: false },
@@ -514,6 +518,7 @@ export function useThreadActions() {
         refreshArchivedThreadsForEnvironment(target.environmentId);
         clearTerminalUiState(target);
         clearDeletedThreadPanelState(target);
+        untrackSessionEphemeralThread(target);
       }
       return result;
     }
@@ -661,6 +666,7 @@ export function useThreadActions() {
     );
     clearTerminalUiState(threadRef);
     clearDeletedThreadPanelState(threadRef);
+    untrackSessionEphemeralThread(threadRef);
 
     if (shouldNavigateToFallback && !navigatedDuringDelete) {
       const fallbackThread = fallbackThreadId
@@ -1058,11 +1064,25 @@ export function useThreadActions() {
     return deleteThread(target);
   };
 
+  const keepEphemeralThread = async (target: ScopedThreadRef) => {
+    const permissionFailure = threadOperationFailure(target);
+    if (permissionFailure) return permissionFailure;
+    const result = await updateThreadMetadataMutation({
+      environmentId: target.environmentId,
+      input: { threadId: target.threadId, ephemeral: false },
+    });
+    if (result._tag === "Success") {
+      untrackSessionEphemeralThread(target);
+    }
+    return result;
+  };
+
   return {
     archiveThread,
     unarchiveThread,
     deleteThread,
     confirmAndDeleteThread,
+    keepEphemeralThread,
     settleThread,
     unsettleThread,
     snoozeThread,

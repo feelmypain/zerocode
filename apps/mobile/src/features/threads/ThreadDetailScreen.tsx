@@ -1950,6 +1950,16 @@ function ThreadDetailBody(
                               onFreshSession: () => setFreshSessionPending(selectedThreadKey, true),
                             }
                           : {})}
+                        {...(!props.draftMode && props.selectedThread.ephemeral === true
+                          ? {
+                              onKeepEphemeral: () => {
+                                void updateMetadata({
+                                  environmentId: props.environmentId,
+                                  input: { threadId: props.selectedThread.id, ephemeral: false },
+                                });
+                              },
+                            }
+                          : {})}
                         offersSideChat={
                           props.offersSideChat &&
                           !props.draftMode &&

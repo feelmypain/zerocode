@@ -208,6 +208,7 @@ export function makeThreadCommands(shared: OrchestratorShared, callbacks: Thread
       projectId: command.projectId,
       title: command.title,
       ...(command.titleRenamed === true ? { titleRenamed: true } : {}),
+      ...(command.ephemeral === true ? { ephemeral: true } : {}),
       providerInstanceId: command.modelSelection.instanceId,
       modelSelection: command.modelSelection,
       runtimeMode: command.runtimeMode,
@@ -1213,6 +1214,7 @@ export function makeThreadCommands(shared: OrchestratorShared, callbacks: Thread
                 : {}),
             ...(command.branch === undefined ? {} : { branch: command.branch }),
             ...(command.worktreePath === undefined ? {} : { worktreePath: command.worktreePath }),
+            ...(command.ephemeral === undefined ? {} : { ephemeral: command.ephemeral }),
             ...(command.linkedPullRequest === undefined
               ? {}
               : {

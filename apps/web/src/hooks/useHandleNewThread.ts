@@ -45,7 +45,10 @@ import {
   threadHasStarted,
 } from "../lib/chatThreadActions";
 import type { EnvironmentProject } from "@zerocode/client-runtime/state/shell";
-import { peekZeroCodeProjectFile, readZeroCodeProjectFile } from "../lib/zeroCodeProjectFileDefaults";
+import {
+  peekZeroCodeProjectFile,
+  readZeroCodeProjectFile,
+} from "../lib/zeroCodeProjectFileDefaults";
 import { appAtomRegistry } from "../rpc/atomRegistry";
 import { environmentSummaries } from "../state/presentation";
 import { environmentServerConfigsAtom } from "../state/server";
@@ -141,6 +144,7 @@ export function createNewThreadHandler(router: AnyRouter) {
       envMode?: DraftThreadEnvMode;
       startFromOrigin?: boolean;
       replace?: boolean;
+      ephemeral?: boolean;
       /** Composer text for the draft, set before it shows. A draft with user text keeps it. */
       prompt?: string;
     },
@@ -272,7 +276,10 @@ export function createNewThreadHandler(router: AnyRouter) {
           .includes(project.environmentId);
       if (!consultProjectFile) return { envMode: envModeFor(null), applyProjectFile: () => {} };
       const projectFileRead = readZeroCodeProjectFile(project.environmentId, project.workspaceRoot);
-      const cachedProjectFile = peekZeroCodeProjectFile(project.environmentId, project.workspaceRoot);
+      const cachedProjectFile = peekZeroCodeProjectFile(
+        project.environmentId,
+        project.workspaceRoot,
+      );
       if (cachedProjectFile !== undefined) {
         return { envMode: envModeFor(cachedProjectFile), applyProjectFile: () => {} };
       }
@@ -358,11 +365,16 @@ export function createNewThreadHandler(router: AnyRouter) {
             startFromOrigin: startFromOriginFor(defaultEnvMode.envMode),
           };
         }
-        if (workspaceContext) {
+        if (workspaceContext || options?.ephemeral !== undefined || !isDraftAlreadyOpen) {
           setDraftThreadContext(emptyStoredDraftThread.draftId, {
             ...workspaceContext,
             ...(!isDraftAlreadyOpen ? { runtimeMode: defaultRuntimeMode } : {}),
             ...(carryInteractionMode ? { interactionMode: carryInteractionMode } : {}),
+            ...(options?.ephemeral !== undefined
+              ? { ephemeral: options.ephemeral }
+              : !isDraftAlreadyOpen
+                ? { ephemeral: false }
+                : {}),
           });
         }
         const storedDraft = getComposerDraft(emptyStoredDraftThread.draftId);
@@ -388,6 +400,11 @@ export function createNewThreadHandler(router: AnyRouter) {
             ...workspaceContext,
             ...(!isDraftAlreadyOpen ? { runtimeMode: defaultRuntimeMode } : {}),
             ...(carryInteractionMode ? { interactionMode: carryInteractionMode } : {}),
+            ...(options?.ephemeral !== undefined
+              ? { ephemeral: options.ephemeral }
+              : !isDraftAlreadyOpen
+                ? { ephemeral: false }
+                : {}),
           },
         );
         const opened = {
@@ -423,9 +440,13 @@ export function createNewThreadHandler(router: AnyRouter) {
         hasBranchOption ||
         hasWorktreePathOption ||
         hasEnvModeOption ||
-        hasStartFromOriginOption
+        hasStartFromOriginOption ||
+        options?.ephemeral !== undefined
       ) {
-        setDraftThreadContext(currentRouteTarget.draftId, pickExplicitWorkspaceOptions(options));
+        setDraftThreadContext(currentRouteTarget.draftId, {
+          ...pickExplicitWorkspaceOptions(options),
+          ...(options?.ephemeral !== undefined ? { ephemeral: options.ephemeral } : {}),
+        });
       }
       setLogicalProjectDraftThreadId(logicalProjectKey, projectRef, currentRouteTarget.draftId, {
         threadId: latestActiveDraftThread.threadId,
@@ -433,6 +454,7 @@ export function createNewThreadHandler(router: AnyRouter) {
         runtimeMode: latestActiveDraftThread.runtimeMode,
         interactionMode: latestActiveDraftThread.interactionMode,
         ...pickExplicitWorkspaceOptions(options),
+        ...(options?.ephemeral !== undefined ? { ephemeral: options.ephemeral } : {}),
       });
       seedPrompt(currentRouteTarget.draftId);
       return Promise.resolve({
@@ -455,6 +477,7 @@ export function createNewThreadHandler(router: AnyRouter) {
         envMode: initialEnvMode,
         startFromOrigin: options?.startFromOrigin ?? startFromOriginFor(initialEnvMode),
         runtimeMode: defaultRuntimeMode,
+        ...(options?.ephemeral ? { ephemeral: true } : {}),
         ...(carryInteractionMode ? { interactionMode: carryInteractionMode } : {}),
       });
       applyStickyState(draftId);

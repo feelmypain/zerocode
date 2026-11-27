@@ -1210,6 +1210,7 @@ export function createThreadOutboxDelivery(): {
         ...(workspace.repositories === undefined
           ? {}
           : { worktreeRepositories: workspace.repositories }),
+        ...(workspace.ephemeral ? { ephemeral: true } : {}),
         worktreeBranchName: buildTemporaryWorktreeBranchName(randomHex),
       }),
     });

@@ -12,7 +12,7 @@ import {
   squashAtomCommandFailure,
 } from "@zerocode/client-runtime/state/runtime";
 import { T, useGT, Var } from "gt-react";
-import { ChevronDownIcon } from "lucide-react";
+import { ChevronDownIcon, MessageCircleDashedIcon } from "lucide-react";
 import {
   memo,
   useEffect,
@@ -50,6 +50,7 @@ interface ChatHeaderProps {
   activeThreadEnvironmentId: EnvironmentId;
   activeThreadId: ThreadId;
   activeThreadTitle: string;
+  activeThreadEphemeral?: boolean | undefined;
   activeThreadLinkOrigin?: string | null | undefined;
   isServerThread: boolean;
   activeProject: EnvironmentProject | null;
@@ -57,6 +58,7 @@ interface ChatHeaderProps {
   onOpenThread: (threadId: ThreadId) => void;
   rightPanelOpen: boolean;
   onNewThreadInProject: () => void;
+  onKeepEphemeralThread?: (() => void) | undefined;
   onOpenProjectSettings?: (() => void) | undefined;
   onFindInThread?: ((threadRef: ScopedThreadRef) => void) | undefined;
 }
@@ -75,6 +77,7 @@ export const ChatHeader = memo(function ChatHeader({
   activeThreadEnvironmentId,
   activeThreadId,
   activeThreadTitle,
+  activeThreadEphemeral,
   activeThreadLinkOrigin,
   isServerThread,
   activeProject,
@@ -82,6 +85,7 @@ export const ChatHeader = memo(function ChatHeader({
   onOpenThread,
   rightPanelOpen,
   onNewThreadInProject,
+  onKeepEphemeralThread,
   onOpenProjectSettings,
   onFindInThread,
 }: ChatHeaderProps) {
@@ -381,7 +385,7 @@ export const ChatHeader = memo(function ChatHeader({
               render={
                 <h2
                   aria-label={activeThreadTitle}
-                  className="min-w-0 flex-1"
+                  className="min-w-0"
                   dir={textDirection(activeThreadTitle)}
                 />
               }
@@ -390,6 +394,37 @@ export const ChatHeader = memo(function ChatHeader({
               <WorkspaceBreadcrumbText>{activeThreadTitle}</WorkspaceBreadcrumbText>
             </SharedTooltipTrigger>
           )}
+          {renamingTitle === null && activeThreadEphemeral ? (
+            <SharedTooltipTrigger
+              render={
+                isServerThread && canOperateThread && onKeepEphemeralThread ? (
+                  <button
+                    type="button"
+                    data-testid="chat-header-ephemeral-badge"
+                    onClick={onKeepEphemeralThread}
+                    className="inline-flex shrink-0 cursor-pointer items-center gap-1 rounded-full border border-dashed border-border/90 bg-muted/45 px-2 py-0.5 text-2xs font-medium text-muted-foreground transition-colors hover:border-foreground/35 hover:text-foreground focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
+                  />
+                ) : (
+                  <span
+                    data-testid="chat-header-ephemeral-badge"
+                    className="inline-flex shrink-0 items-center gap-1 rounded-full border border-dashed border-border/90 bg-muted/45 px-2 py-0.5 text-2xs font-medium text-muted-foreground"
+                  />
+                )
+              }
+              label={
+                isServerThread && canOperateThread ? (
+                  <T>Deletes when you leave the app. Click to keep permanently.</T>
+                ) : (
+                  <T>Deletes when you leave the app.</T>
+                )
+              }
+            >
+              <MessageCircleDashedIcon aria-hidden="true" className="size-3 shrink-0" />
+              <span>
+                <T>Ephemeral</T>
+              </span>
+            </SharedTooltipTrigger>
+          ) : null}
           {renamingTitle === null && activeThreadLinkOrigin ? (
             <SharedTooltipTrigger
               render={<Badge variant="info" size="sm" />}

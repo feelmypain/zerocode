@@ -583,6 +583,8 @@ const makeOrchestrationV2AppThread = <DateTimeField extends OrchestrationV2DateT
     ),
     /** Set by a rename or a naming launch until a generated title replaces it; absent reads false. */
     titleRenamed: Schema.optional(Schema.Boolean),
+    /** Temporary chat that clears when the user leaves the app unless explicitly kept; absent reads false. */
+    ephemeral: Schema.optional(Schema.Boolean),
     rollbackRequestId: Schema.optional(CommandId),
     rollbackFailure: Schema.optional(
       Schema.NullOr(
@@ -2897,6 +2899,7 @@ const makeOrchestrationV2ThreadShell = <
     lastTitleRegeneration: Schema.optional(
       Schema.NullOr(makeOrchestrationV2LastTitleRegeneration(dateTime)),
     ),
+    ephemeral: Schema.optional(Schema.Boolean),
     deletedAt: Schema.NullOr(dateTime),
   });
 
@@ -3082,6 +3085,7 @@ export const OrchestrationV2Command = Schema.Union([
     projectId: ProjectId,
     title: TrimmedNonEmptyString,
     titleRenamed: Schema.optional(Schema.Boolean),
+    ephemeral: Schema.optional(Schema.Boolean),
     modelSelection: ModelSelection,
     runtimeMode: RuntimeMode,
     interactionMode: ProviderInteractionMode,
@@ -3252,6 +3256,8 @@ export const OrchestrationV2Command = Schema.Union([
     limitRecovery: Schema.optional(Schema.NullOr(OrchestrationV2LimitRecoveryUpdate)),
     /** Link (object) or unlink (null) a pull request; absent leaves it unchanged. */
     linkedPullRequest: Schema.optional(Schema.NullOr(ThreadLinkedPullRequest)),
+    /** Toggle ephemeral state; setting false promotes the chat into a permanent thread. */
+    ephemeral: Schema.optional(Schema.Boolean),
   }),
   Schema.Struct({
     type: Schema.Literal("thread.pull-request.link"),
@@ -3922,6 +3928,7 @@ export const OrchestrationV2ThreadLaunchInput = Schema.Struct({
   projectId: ProjectId,
   title: TrimmedNonEmptyString,
   generateTitle: Schema.optional(Schema.Boolean),
+  ephemeral: Schema.optional(Schema.Boolean),
   modelSelection: ModelSelection,
   runtimeMode: RuntimeMode,
   interactionMode: ProviderInteractionMode,
@@ -3950,6 +3957,8 @@ export const OrchestrationV2DispatchCommandResult = Schema.Struct({
   sequence: NonNegativeInt,
 });
 export type OrchestrationV2DispatchCommandResult = typeof OrchestrationV2DispatchCommandResult.Type;
+
+export const EPHEMERAL_THREADS_CLEANUP_PATH = "/api/threads/ephemeral/cleanup";
 
 export const OrchestrationV2GetThreadProjectionInput = Schema.Struct({
   threadId: ThreadId,

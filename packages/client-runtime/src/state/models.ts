@@ -217,6 +217,7 @@ export interface EnvironmentThreadShell {
   /** Server-tracked open history for search ranking. */
   readonly opens?: import("@zerocode/contracts").OrchestrationV2ThreadOpens | null;
   readonly titleRegeneration?: { readonly requestId: string; readonly startedAt: string } | null;
+  readonly ephemeral?: boolean;
   readonly deletedAt: string | null;
   readonly source: OrchestrationV2ThreadShell;
 }
@@ -373,6 +374,7 @@ export function presentThreadShell(
             requestId: thread.titleRegeneration.requestId,
             startedAt: iso(thread.titleRegeneration.startedAt),
           },
+    ephemeral: thread.ephemeral === true,
     deletedAt: nullableIso(thread.deletedAt),
     source: thread,
   };

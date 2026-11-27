@@ -65,6 +65,10 @@ import {
 import { type ChatMessage, DEFAULT_INTERACTION_MODE } from "../../types";
 import { recordPromptSent } from "../GitHubStarPrompt";
 import { stackedThreadToast, toastManager } from "../ui/toast";
+import {
+  trackSessionEphemeralThread,
+  untrackSessionEphemeralThread,
+} from "../../lib/ephemeralThreads";
 import { writeTextToClipboard } from "~/hooks/useCopyToClipboard";
 import { newMessageId, newThreadId } from "~/lib/utils";
 import { readPendingWorkspaceDefault, useNewThreadHandler } from "../../hooks/useHandleNewThread";
@@ -96,6 +100,7 @@ import {
   responseContextReference,
 } from "../../lib/composerContextRecords";
 import { environmentServerConfigsAtom } from "../../state/server";
+import { readThreadShell } from "../../state/entities";
 import { threadEnvironment } from "../../state/threads";
 import { runMobileComposerTransition } from "./draftHeroTransition";
 import { useClientSettingsHydrated } from "../../hooks/useSettings";
@@ -1540,6 +1545,7 @@ export function useComposerSend(input: ComposerSendInput) {
                     createThread: {
                       projectId: activeProject.id,
                       title,
+                      ...(draftThread?.ephemeral ? { ephemeral: true } : {}),
                       modelSelection: threadCreateModelSelection,
                       runtimeMode,
                       interactionMode: DEFAULT_INTERACTION_MODE,
@@ -1574,6 +1580,13 @@ export function useComposerSend(input: ComposerSendInput) {
           )
         : null;
       if (backgroundThreadRef) beginBackgroundDraftSubmissionByRef(backgroundThreadRef);
+      const createdEphemeralThreadRef =
+        isLocalDraftThread && draftThread?.ephemeral
+          ? scopeThreadRef(environmentId, threadIdForSend)
+          : null;
+      if (createdEphemeralThreadRef) {
+        trackSessionEphemeralThread(createdEphemeralThreadRef);
+      }
       const startPromise = startThreadTurn({
         environmentId,
         input: {
@@ -1624,6 +1637,9 @@ export function useComposerSend(input: ComposerSendInput) {
       }
       const startResult = await startPromise;
       if (startResult._tag === "Failure") {
+        if (createdEphemeralThreadRef && readThreadShell(createdEphemeralThreadRef) === null) {
+          untrackSessionEphemeralThread(createdEphemeralThreadRef);
+        }
         failure = startResult;
       } else {
         turnStartSucceeded = true;

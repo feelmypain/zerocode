@@ -182,6 +182,7 @@ export function ChatComposerFooterBar(props: {
   readonly dictationTakesFooter: boolean;
   readonly isComposerPrimaryActionsCompact: boolean;
   readonly composerAttachButton: ReactNode;
+  readonly composerEphemeralButton?: ReactNode;
   readonly composerControls: ReactNode;
   readonly attachExpandedComposerControls: Ref<HTMLDivElement>;
   readonly showInlineRestingControls: boolean;
@@ -232,6 +233,7 @@ export function ChatComposerFooterBar(props: {
     dictationTakesFooter,
     isComposerPrimaryActionsCompact,
     composerAttachButton,
+    composerEphemeralButton,
     composerControls,
     attachExpandedComposerControls,
     showInlineRestingControls,
@@ -291,8 +293,11 @@ export function ChatComposerFooterBar(props: {
               "hidden sm:flex",
           )}
         >
-          {composerAttachButton && !dictationTakesFooter ? (
-            <div className="me-2">{composerAttachButton}</div>
+          {(composerAttachButton || composerEphemeralButton) && !dictationTakesFooter ? (
+            <div className="me-2 flex shrink-0 items-center gap-1">
+              {composerAttachButton}
+              {composerEphemeralButton}
+            </div>
           ) : null}
           <div
             data-chat-composer-actions="right"

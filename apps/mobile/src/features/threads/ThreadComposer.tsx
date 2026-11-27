@@ -154,6 +154,8 @@ export interface ThreadComposerProps {
   } | null;
   /** Arms a fresh session for the next message; absent where `/clear` is unavailable. */
   readonly onFreshSession?: () => void;
+  /** Promotes an active ephemeral thread into a permanent thread. */
+  readonly onKeepEphemeral?: () => void;
   readonly offersSideChat?: boolean;
   readonly serverConfig: ZeroCodeServerConfig | null;
   readonly queueCount: number;
@@ -703,6 +705,20 @@ export const ThreadComposer = function ThreadComposer(props: ThreadComposerProps
     </View>
   );
 
+  const ephemeralControl =
+    !props.isDraft && props.selectedThread.ephemeral === true && props.onKeepEphemeral ? (
+      <ComposerInlineControl
+        size={usesLargeControls ? "large" : "regular"}
+        icon="circle.dashed"
+        label={gt("Ephemeral")}
+        selected
+        showChevron={false}
+        disabled={!props.canOperateThread}
+        accessibilityLabel={gt("Ephemeral chat")}
+        accessibilityHint={gt("Keep chat permanently")}
+        onPress={props.onKeepEphemeral}
+      />
+    ) : null;
   const compactBeforeSend =
     props.compactBeforeSend && !showResumeAction && queuedEdit === null
       ? props.compactBeforeSend
@@ -853,7 +869,8 @@ export const ThreadComposer = function ThreadComposer(props: ThreadComposerProps
                     minWidth:
                       compactEditor.isExpanded ||
                       stripAttachments.length > 0 ||
-                      compactControl !== null
+                      compactControl !== null ||
+                      ephemeralControl !== null
                         ? 0
                         : INLINE_EDITOR_MIN_WIDTH,
                   },
@@ -1041,6 +1058,7 @@ export const ThreadComposer = function ThreadComposer(props: ThreadComposerProps
                   className="min-w-0 shrink flex-row items-center"
                   entering={compactEditor.toolbarControlsEntering}
                 >
+                  {ephemeralControl}
                   {compactControl}
                   {modelControl}
                 </Animated.View>

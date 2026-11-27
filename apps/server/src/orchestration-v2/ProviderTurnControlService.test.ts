@@ -139,6 +139,7 @@ function layerProjectionStore(
       getAgentAwarenessSnapshot: () => Effect.die("unused awareness snapshot"),
       getShellSnapshot: () => Effect.die("unused getShellSnapshot"),
       listActiveSubagentThreadIds: () => Effect.die("unused listActiveSubagentThreadIds"),
+      listEphemeralThreadIds: () => Effect.die("unused listEphemeralThreadIds"),
       countThreads: () => Effect.die("unused countThreads"),
       listActiveShellIndex: () => Effect.die("unused listActiveShellIndex"),
       listActiveThreads: () => Effect.die("unused listActiveThreads"),
