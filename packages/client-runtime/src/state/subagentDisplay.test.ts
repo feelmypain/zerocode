@@ -6,6 +6,7 @@ describe("subagentDetailPreview", () => {
   it("prefers progress for live work and results for settled work", () => {
     const details = { progress: "Reading files", result: "Found two\n  problems" };
     expect(subagentDetailPreview({ ...details, status: "running" })).toBe("Reading files");
+    expect(subagentDetailPreview({ ...details, status: "idle" })).toBe("Found two problems");
     expect(subagentDetailPreview({ ...details, status: "completed" })).toBe("Found two problems");
     expect(
       subagentDetailPreview({ status: "failed", progress: "Last progress", result: " " }),

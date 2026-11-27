@@ -1518,6 +1518,15 @@ function runningSubagentsAtRunTail(entries: ReadonlyArray<TimelineEntry>, runId:
     ) {
       continue;
     }
+    // Completed thoughts or plan updates right before parking belong to the turn settling.
+    if (
+      entry.kind === "work" &&
+      entry.entry.runId === runId &&
+      entry.entry.toolLifecycleStatus !== "inProgress" &&
+      (entry.entry.itemType === "reasoning" || entry.entry.itemType === "todo_list")
+    ) {
+      continue;
+    }
     if (entry.kind !== "event") break;
     const { item } = entry.projectedItem;
     if (item.type !== "subagent" || item.runId !== runId) break;
@@ -1788,9 +1797,18 @@ export function deriveMessagesTimelineRows(
   const latestThoughtEntry = visibleActiveToolEntries.findLast(
     (entry) => entry.entry.itemType === "reasoning" && (entry.entry.detail?.trim() ?? "") !== "",
   );
+  const tailOnlySettledReasoningOnRunningSubagents =
+    latestRunningToolEntry === undefined &&
+    activeToolEntries.length > 0 &&
+    activeToolEntries.every((entry) => entry.entry.itemType === "reasoning") &&
+    unsettledRunId !== null &&
+    runningSubagentsAtRunTail(input.timelineEntries, unsettledRunId) > 0;
   const activeWorkPlacementEntryId = latestVisibleToolEntry?.id;
   const activeWorkRow =
-    activeWorkAnchor && latestVisibleToolEntry && !latestToolFailed
+    activeWorkAnchor &&
+    latestVisibleToolEntry &&
+    !latestToolFailed &&
+    !tailOnlySettledReasoningOnRunningSubagents
       ? (() => {
           const groupId = workGroupId(activeWorkAnchor.id);
           return {

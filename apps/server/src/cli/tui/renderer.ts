@@ -434,7 +434,7 @@ function renderTurnItemLines(
     case "reasoning": {
       if (!config.showThinking || !item.text.trim()) return [];
       const out: Array<string> = [];
-      const label = item.streaming ? "💭 Thinking…" : "💭 Thinking";
+      const label = item.streaming ? "💭 Thinking…" : "💭 Thought";
       out.push(`   ${theme.italic("thinking", label)}`);
       const rawLines = item.text.trim().split("\n");
       const limit = config.showTools === "expanded" ? 24 : 6;
@@ -568,14 +568,25 @@ function renderTurnItemLines(
     }
 
     case "subagent": {
-      const icon =
-        item.status === "running" || item.status === "pending"
-          ? theme.fg("accent", SPINNER_FRAMES[state.spinnerFrame % SPINNER_FRAMES.length]!)
-          : item.status === "failed"
-            ? theme.fg("toolErr", "✗")
-            : theme.fg("toolOk", "✓");
+      const active =
+        item.status === "running" || item.status === "pending" || item.status === "waiting";
+      const icon = active
+        ? theme.fg("accent", SPINNER_FRAMES[state.spinnerFrame % SPINNER_FRAMES.length]!)
+        : item.status === "failed"
+          ? theme.fg("toolErr", "✗")
+          : item.status === "idle"
+            ? theme.dimText("○")
+            : item.status === "cancelled" || item.status === "interrupted"
+              ? theme.dimText("■")
+              : theme.fg("toolOk", "✓");
+      const statusSuffix =
+        item.status === "idle"
+          ? ` ${theme.dimText("(idle)")}`
+          : item.status === "cancelled" || item.status === "interrupted"
+            ? ` ${theme.dimText("(stopped)")}`
+            : "";
       return [
-        `   ${icon} ${theme.bold("assistantLabel", "Subagent")} ${theme.dimText(truncateAnsi(item.prompt, Math.max(10, contentWidth - 16)))}`,
+        `   ${icon} ${theme.bold("assistantLabel", "Subagent")}${statusSuffix} ${theme.dimText(truncateAnsi(item.prompt, Math.max(10, contentWidth - 24)))}`,
       ];
     }
 

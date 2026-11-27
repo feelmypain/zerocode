@@ -787,4 +787,110 @@ it.layer(NodeServices.layer)("readAntigravityChildWork", (it) => {
         expect(yield* pending()).toBe(false);
       }),
   );
+
+  it.effect(
+    "treats detached subagents with a finished reply transcript or waiting swarm phase as idle",
+    () =>
+      Effect.gen(function* () {
+        const fs = yield* FileSystem.FileSystem;
+        const path = yield* Path.Path;
+        const profile = yield* fs.makeTempDirectoryScoped({ prefix: "zerocode-agy-idle-kids-" });
+        const writeFile = (segments: ReadonlyArray<string>, content: string) => {
+          const target = path.join(profile, "antigravity-acp", "brain", ...segments);
+          return fs
+            .makeDirectory(path.dirname(target), { recursive: true })
+            .pipe(Effect.andThen(fs.writeFileString(target, content)));
+        };
+        const writeDetached = (
+          convId: string,
+          callId: string,
+          state: string | undefined,
+          transcriptLine?: Record<string, unknown>,
+        ) =>
+          Effect.all([
+            writeFile(
+              [ROOT, ".system_generated", "subagents", `${convId}.json`],
+              JSON.stringify({ conversationId: convId, ...(state ? { state } : {}) }),
+            ),
+            writeFile(
+              [convId, ".system_generated", "messages", "launch.json"],
+              JSON.stringify({
+                sender: ROOT,
+                sourceMetadata: {
+                  tool: {
+                    conversationId: ROOT,
+                    toolCall: { id: callId, name: "invoke_subagent" },
+                  },
+                },
+              }),
+            ),
+            ...(transcriptLine === undefined
+              ? []
+              : [
+                  writeFile(
+                    [convId, ".system_generated", "logs", "transcript.jsonl"],
+                    `${JSON.stringify(transcriptLine)}\n`,
+                  ),
+                ]),
+          ]);
+
+        const childDone = "11111111-1111-4111-8111-111111111111";
+        const childToolCall = "22222222-2222-4222-8222-222222222222";
+        const childWoken = "33333333-3333-4333-8333-333333333333";
+        const childSwarmWaiting = "44444444-4444-4444-8444-444444444444";
+        const childCompletedState = "55555555-5555-4555-8555-555555555555";
+
+        yield* writeDetached(childDone, "call_done", "SUBAGENT_STATE_ALIVE", {
+          step_index: 1,
+          type: "PLANNER_RESPONSE",
+          status: "DONE",
+          content: "Finished without sending a separate message.",
+        });
+        yield* writeDetached(childToolCall, "call_tool", "SUBAGENT_STATE_ALIVE", {
+          step_index: 1,
+          type: "PLANNER_RESPONSE",
+          status: "DONE",
+          tool_calls: [{ name: "read_file", args: {} }],
+        });
+        yield* writeDetached(childWoken, "call_woken", "SUBAGENT_STATE_ALIVE", {
+          step_index: 1,
+          type: "PLANNER_RESPONSE",
+          status: "DONE",
+          content: "Done with round 1.",
+        });
+        yield* writeFile(
+          [childWoken, ".system_generated", "messages", "wake-2.json"],
+          JSON.stringify({ id: "wake-2", priority: "MESSAGE_PRIORITY_HIGH", sender: ROOT }),
+        );
+        yield* writeDetached(childSwarmWaiting, "call_swarm_waiting", "SUBAGENT_STATE_ALIVE");
+        yield* writeDetached(childCompletedState, "call_state_done", "SUBAGENT_STATE_COMPLETED");
+        yield* writeFile(
+          [ROOT, ".system_generated", "swarm", "members.json"],
+          JSON.stringify({
+            members: {
+              waiter: {
+                conversation_id: childSwarmWaiting,
+                role: "worker",
+                phase: "WAITING",
+                wake_mode: "working",
+              },
+            },
+          }),
+        );
+
+        expect(
+          yield* readAntigravityChildrenAtWork({
+            profileDirectory: profile,
+            rootSessionId: ROOT,
+            toolCallIds: [
+              "call_done",
+              "call_tool",
+              "call_woken",
+              "call_swarm_waiting",
+              "call_state_done",
+            ],
+          }),
+        ).toEqual(["call_tool", "call_woken"]);
+      }),
+  );
 });

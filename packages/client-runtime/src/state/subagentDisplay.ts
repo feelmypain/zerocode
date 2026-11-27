@@ -8,7 +8,7 @@ import type {
 import { formatModelSlugName, resolveSelectableModel } from "@zerocode/shared/model";
 import { fileDisplayName } from "@zerocode/shared/path";
 import { resolveModelShortName } from "../providerClients.ts";
-import { isTerminalSubagentStatus } from "./subagentRuntime.ts";
+import { isActiveSubagentStatus } from "./subagentRuntime.ts";
 import { mFallback, msg } from "gt-i18n";
 import type { MFunctionType } from "gt-i18n/types";
 
@@ -151,9 +151,9 @@ export function subagentDetailPreview(input: {
   readonly result?: string | null | undefined;
   readonly progress?: string | null | undefined;
 }): string | null {
-  const terminal = isTerminalSubagentStatus(input.status);
-  const preferred = terminal ? input.result : input.progress;
-  const fallback = terminal ? input.progress : input.result;
+  const settled = !isActiveSubagentStatus(input.status);
+  const preferred = settled ? input.result : input.progress;
+  const fallback = settled ? input.progress : input.result;
   const detail = preferred?.trimStart() || fallback?.trimStart() || "";
   if (detail.length <= 280) return detail.trimEnd().replace(/\s+/gu, " ") || null;
   const whitespace = /\s+/uy;

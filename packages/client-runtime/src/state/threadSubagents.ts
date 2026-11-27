@@ -19,6 +19,7 @@ export interface ThreadTurnSubagents {
   readonly subagents: ReadonlyArray<Subagent>;
   readonly liveCount: number;
   readonly settledCount: number;
+  readonly idleCount: number;
 }
 
 export interface SubagentPillSegment {
@@ -78,9 +79,11 @@ export function deriveThreadTurnSubagents(
 
   let liveCount = 0;
   let settledCount = 0;
+  let idleCount = 0;
   for (const subagent of subagents) {
     if (isActiveSubagentStatus(subagent.status)) liveCount += 1;
     else if (isTerminalSubagentStatus(subagent.status)) settledCount += 1;
+    else if (subagent.status === "idle") idleCount += 1;
   }
   return {
     runId,
@@ -89,6 +92,7 @@ export function deriveThreadTurnSubagents(
     subagents,
     liveCount,
     settledCount,
+    idleCount,
   };
 }
 
@@ -114,6 +118,10 @@ export function resolveSubagentPillSegment(
         msg("{live} of {total} agents working", { live: turn.liveCount, total }),
       ),
     };
+  }
+  if (turn.settledCount === 0 && turn.idleCount > 0) {
+    const label = resolve(msg("{count} idle", { count: turn.idleCount }));
+    return { label, accessibilityLabel: label };
   }
   return {
     label: resolve(msg("{count} done", { count: turn.settledCount })),

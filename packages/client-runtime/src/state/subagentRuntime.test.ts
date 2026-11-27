@@ -14,6 +14,7 @@ import {
   projectedSubagentsToRuntime,
   resolveWorkflowOpening,
   workflowMemberModelSelection,
+  workflowOpeningHeadline,
 } from "./subagentRuntime.ts";
 import { resolveSubagentMetadata } from "./subagentDisplay.ts";
 import { formatSubagentEffort } from "./threadExecution.ts";
@@ -328,5 +329,40 @@ describe("resolveWorkflowOpening", () => {
     expect(
       isWorkflowScriptMessage({ role: "user", text: `${"/**/".repeat(200)}const x = 1;` }),
     ).toBe(false);
+  });
+
+  it("reports idle workflow members as idle rather than working", () => {
+    const opening = resolveWorkflowOpening({
+      thread: childThread,
+      messages: [brief(SCRIPT, true)],
+      parentSubagents: [
+        coordinator({
+          name: "probe-wf",
+          phases: [{ index: 1, title: "Alpha" }],
+          agents: [
+            member({ index: 1, label: "alpha:one", state: "running" }),
+            member({ index: 2, label: "alpha:two", state: "completed" }),
+          ],
+        }),
+      ],
+    });
+    expect(opening?.group).not.toBeNull();
+    const withIdle = {
+      ...opening!,
+      group: {
+        ...opening!.group!,
+        phases: opening!.group!.phases.map((phase) => ({
+          ...phase,
+          members: phase.members.map((agent, index) =>
+            index === 0 ? { ...agent, status: "idle" as const } : agent,
+          ),
+        })),
+      },
+    };
+    expect(workflowOpeningHeadline(withIdle)).toEqual({
+      title: "probe-wf",
+      description: "Run the alpha workflow",
+      agents: "2 agents · 1 idle · 1 done",
+    });
   });
 });

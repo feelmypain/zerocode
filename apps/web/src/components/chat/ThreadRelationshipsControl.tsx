@@ -358,7 +358,10 @@ function RemoteSubagentRow(props: {
             <span className="shrink-0 tabular-nums">
               ·{" "}
               {showElapsed ? (
-                <AgentElapsed agent={timing} compact />
+                <>
+                  {status === "idle" ? `${threadRelationshipStatusLabel(status, m)} · ` : null}
+                  <AgentElapsed agent={timing} compact />
+                </>
               ) : (
                 threadRelationshipStatusLabel(status, m)
               )}
@@ -913,6 +916,12 @@ export function ThreadRelationshipsPanel(props: {
           <span
             className={`shrink-0 text-2xs font-normal tabular-nums text-muted-foreground ${canStopWorkflow ? "min-w-6 text-end" : ""} ${trailingVisibilityClass}`}
           >
+            {rowStatus === "idle" && !workflowGroup ? (
+              <>
+                {threadRelationshipStatusLabel(rowStatus, m)}
+                {" · "}
+              </>
+            ) : null}
             <AgentElapsed agent={agent} compact />
           </span>
         ) : !isMergeTarget ? (

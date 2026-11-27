@@ -3,7 +3,7 @@ import type { SideThreadOpenIntent } from "@zerocode/client-runtime/side-thread"
 import { useSideThreadTrigger } from "../../hooks/useSideThreadTrigger";
 import { useAtomValue } from "@effect/atom-react";
 import {
-  isTerminalSubagentStatus,
+  isActiveSubagentStatus,
   workflowMemberModelSelection,
   workflowOpeningHeadline,
   type RuntimeSubagent,
@@ -123,7 +123,7 @@ function WorkflowMemberRow(props: {
   const threadId = member.childThreadId;
   const failed = member.status === "failed";
   const detail = (
-    isTerminalSubagentStatus(member.status)
+    !isActiveSubagentStatus(member.status)
       ? (member.error ?? member.result ?? member.progress)
       : member.progress
   )

@@ -2067,6 +2067,17 @@ function runningSubagentsAtRunTail(feed: ReadonlyArray<ThreadFeedEntry>, runId: 
     }
     if (entry.type !== "activity-group" || entry.runId !== runId) break;
     const items = entry.activities.map((activity) => activity.projectedItem.item);
+    if (
+      items.every(
+        (item) =>
+          (item.type === "reasoning" || item.type === "todo_list") &&
+          item.status !== "running" &&
+          item.status !== "pending" &&
+          item.status !== "waiting",
+      )
+    ) {
+      continue;
+    }
     if (items.some((item) => item.type !== "subagent")) break;
     running += items.filter(isLiveSubagentTurnItem).length;
   }

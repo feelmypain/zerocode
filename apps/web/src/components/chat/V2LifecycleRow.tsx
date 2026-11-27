@@ -225,6 +225,7 @@ function subagentStatusVisual(status: OrchestrationV2TurnItem["status"]) {
 }
 
 const SETTLED_SUBAGENT_STATUSES = new Set<OrchestrationV2TurnItem["status"]>([
+  "idle",
   "completed",
   "failed",
   "cancelled",

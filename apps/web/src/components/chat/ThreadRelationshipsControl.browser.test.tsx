@@ -594,3 +594,70 @@ it.each([1, 18])("continues scrolling the panel past a list of %i subagents", as
   await userEvent.wheel(list, { delta: { y: 300 } });
   await vi.waitFor(() => expect(viewport.scrollTop).toBeGreaterThan(0));
 });
+
+it("shows Idle visibly on an idle subagent row with elapsed time and avoids the dashed active icon in its hover card", async () => {
+  setup();
+  const projection = makeThreadProjectionFixture();
+  const childThreadId = ThreadId.make("idle-subagent");
+  const startedAt = DateTime.makeUnsafe("2026-07-01T10:00:00.000Z");
+  const completedAt = DateTime.makeUnsafe("2026-07-01T10:00:12.000Z");
+  state.projection = {
+    ...projection,
+    subagents: [
+      {
+        id: NodeId.make("subagent-idle"),
+        threadId: projection.thread.id,
+        runId: null,
+        parentNodeId: null,
+        origin: "provider_native",
+        createdBy: "agent",
+        driver: "antigravity",
+        providerInstanceId: "antigravity",
+        providerThreadId: null,
+        childThreadId,
+        nativeTaskRef: null,
+        title: "Codebase Scout",
+        prompt: "Inspect codebase",
+        model: "gemini-3-pro",
+        status: "idle",
+        result: "Inspected all files",
+        startedAt,
+        completedAt,
+        updatedAt: completedAt,
+      },
+    ],
+  };
+  state.relatedShells = [
+    {
+      ...projection.thread,
+      id: childThreadId,
+      title: "Codebase Scout",
+      forkedFrom: null,
+      lineage: { parentThreadId: projection.thread.id, relationshipToParent: "subagent" },
+      activityRunStatus: null,
+      status: "idle",
+    },
+  ];
+  await using screen = await render(
+    <ThreadRelationshipsPanel
+      environmentId={environmentId}
+      threadId={projection.thread.id}
+      showLineage
+      showSideChats
+    />,
+  );
+
+  await screen.getByRole("button", { name: /Previous agents/ }).click();
+  const row = screen.getByRole("button", { name: /Codebase Scout/ });
+  await expect.element(row).toBeVisible();
+  expect(row.element().textContent).toContain("Idle");
+  expect(row.element().textContent).toContain("12s");
+
+  await row.hover();
+  await vi.waitFor(() => {
+    const popup = document.querySelector('[data-slot="tooltip-popup"]');
+    expect(popup?.textContent).toContain("idle");
+    expect(popup?.querySelector(".lucide-moon")).not.toBeNull();
+    expect(popup?.querySelector(".lucide-circle-dashed")).toBeNull();
+  });
+});

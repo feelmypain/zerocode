@@ -13,7 +13,7 @@ import { useState, type ReactNode } from "react";
 import { AgentElapsed } from "./AgentElapsed";
 import { SubagentTooltipContent } from "./SubagentTooltipContent";
 import { ThreadHoverCardPopup } from "../ThreadHoverCard";
-import { ThreadRelationshipIcon } from "./ThreadRelationshipIcon";
+import { ThreadRelationshipIcon, threadRelationshipStatusLabel } from "./ThreadRelationshipIcon";
 import type { ProviderInstanceEntry } from "../../providerInstances";
 import { cn } from "../../lib/utils";
 import { ThreadDetailsControl } from "./ThreadDetailsControl";
@@ -79,9 +79,11 @@ function WorkflowMemberRow({
   onOpen: (threadId: string, intent: SideThreadOpenIntent) => void;
 }) {
   const gt = useGT();
+  const m = useMessages();
   const trigger = useSideThreadTrigger();
   const threadId = member.childThreadId;
   const canOpen = threadId !== null;
+  const isIdle = member.status === "idle";
   return (
     <li>
       <Tooltip>
@@ -106,7 +108,12 @@ function WorkflowMemberRow({
           <span className="sr-only">{member.status}</span>
           {member.startedAt ? (
             <span className="shrink-0 text-2xs font-normal tabular-nums text-muted-foreground">
+              {isIdle ? `${threadRelationshipStatusLabel("idle", m)} · ` : null}
               <AgentElapsed agent={member} />
+            </span>
+          ) : isIdle ? (
+            <span className="shrink-0 text-2xs font-normal text-muted-foreground">
+              {threadRelationshipStatusLabel("idle", m)}
             </span>
           ) : null}
         </TooltipTrigger>

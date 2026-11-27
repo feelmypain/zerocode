@@ -23,6 +23,7 @@ import {
   CircleXIcon,
   FolderIcon,
   GitBranchIcon,
+  MoonIcon,
   TerminalIcon,
 } from "lucide-react";
 import { ThreadHoverCard } from "../ThreadHoverCard";
@@ -130,7 +131,9 @@ export function SubagentTooltipContent(props: {
       ? CircleXIcon
       : props.status === "completed"
         ? CheckIcon
-        : CircleDashedIcon;
+        : props.status === "idle"
+          ? MoonIcon
+          : CircleDashedIcon;
   return (
     <ThreadHoverCard title={props.title}>
       <div className="flex min-w-0 items-center gap-2">

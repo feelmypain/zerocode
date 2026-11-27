@@ -323,4 +323,22 @@ describe("deriveThreadTurnSubagents", () => {
       accessibilityLabel: "1 agent done",
     });
   });
+
+  it("shows idle count instead of 0 done when all agents are idle", () => {
+    const turn = deriveThreadTurnSubagents({
+      runs: [finishedRun],
+      subagents: [
+        subagent({ id: "a", status: "idle" }),
+        subagent({ id: "b", status: "idle" }),
+      ],
+    });
+
+    expect(turn?.liveCount).toBe(0);
+    expect(turn?.settledCount).toBe(0);
+    expect(turn?.idleCount).toBe(2);
+    expect(resolveSubagentPillSegment(turn)).toEqual({
+      label: "2 idle",
+      accessibilityLabel: "2 idle",
+    });
+  });
 });

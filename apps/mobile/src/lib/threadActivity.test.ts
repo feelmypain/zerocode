@@ -1413,6 +1413,37 @@ describe("buildThreadFeed", () => {
       thinkingLabel(
         present([
           {
+            id: TurnItemId.make("thought"),
+            threadId,
+            runId,
+            nodeId: null,
+            providerThreadId: null,
+            providerTurnId: null,
+            nativeItemRef: null,
+            parentItemId: null,
+            ordinal: 5,
+            type: "reasoning",
+            status: "completed",
+            title: null,
+            text: "Waiting for both subagents.",
+            streaming: false,
+            startedAt: DateTime.makeUnsafe("2026-06-20T00:00:05.000Z"),
+            completedAt: DateTime.makeUnsafe("2026-06-20T00:00:05.000Z"),
+            updatedAt: DateTime.makeUnsafe("2026-06-20T00:00:05.000Z"),
+          },
+          {
+            ...assistantMessage("2026-06-20T00:00:06.000Z"),
+            id: TurnItemId.make("status-2"),
+            messageId: MessageId.make("status-2"),
+            text: "Subagents launched; waiting for them to report back.",
+          },
+        ]),
+      ),
+    ).toBe("Waiting on 2 subagents");
+    expect(
+      thinkingLabel(
+        present([
+          {
             ...assistantMessage("2026-06-20T00:00:05.000Z"),
             id: TurnItemId.make("foreign"),
             messageId: MessageId.make("foreign"),

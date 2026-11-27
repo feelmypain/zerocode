@@ -2398,6 +2398,115 @@ describe("AntigravityAdapterV2 work after the prompt ends", () => {
     }).pipe(Effect.provide(layerSession)),
   );
 
+  it.effect(
+    "polls a detached subagent to idle when its transcript finishes without a root usage_update",
+    () =>
+      Effect.gen(function* () {
+        const fileSystem = yield* FileSystem.FileSystem;
+        const path = yield* Path.Path;
+        const profile = yield* fileSystem.makeTempDirectoryScoped({
+          prefix: "zerocode-antigravity-poll-idle-",
+        });
+        const records = (conversationId: string, kind: string) =>
+          path.join(profile, "antigravity-acp", "brain", conversationId, ".system_generated", kind);
+        const write = (directory: string, name: string, body: string) =>
+          fileSystem
+            .makeDirectory(directory, { recursive: true })
+            .pipe(Effect.andThen(fileSystem.writeFileString(path.join(directory, name), body)));
+        yield* write(
+          records("mock-session-1", "subagents"),
+          "child-1.json",
+          JSON.stringify({ conversationId: "child-1", state: "SUBAGENT_STATE_ALIVE" }),
+        );
+        yield* write(
+          records("child-1", "messages"),
+          "launch.json",
+          JSON.stringify({
+            sender: "mock-session-1",
+            sourceMetadata: {
+              tool: { toolCall: { id: "call_research", name: "invoke_subagent" } },
+            },
+          }),
+        );
+
+        const { scheduledFinalizes, startTurn, until, throughPromptSettled } =
+          yield* openSessionWithRunningCommand({}, profile, undefined, {});
+        yield* startTurn(1, false);
+        const prompt = yield* throughPromptSettled;
+        const subagentStatuses = (events: ReadonlyArray<ProviderAdapter.ProviderAdapterV2Event>) =>
+          events.flatMap((event) =>
+            event.type === "subagent.updated" ? [event.subagent.status] : [],
+          );
+        assert.equal(subagentStatuses(prompt).at(-1), "running");
+
+        // Child finishes its reply on disk without waking the root or emitting usage_update.
+        yield* write(
+          records("child-1", "logs"),
+          "transcript.jsonl",
+          `${JSON.stringify({ step_index: 1, type: "PLANNER_RESPONSE", status: "DONE", content: "All done." })}\n`,
+        );
+        yield* TestClock.adjust("5 seconds");
+        const idled = yield* until(
+          (event) => event.type === "subagent.updated" && event.subagent.status === "idle",
+        );
+        assert.equal(subagentStatuses(idled).at(-1), "idle");
+        assert.equal(yield* Queue.take(scheduledFinalizes), "3000 millis");
+        yield* TestClock.adjust("3 seconds");
+        const run = yield* until((event) => event.type === "turn.terminal");
+        const terminal = run.at(-1);
+        assert.equal(terminal?.type === "turn.terminal" && terminal.status, "completed");
+      }).pipe(Effect.provide(layerSession)),
+  );
+
+  it.effect(
+    "idles a reported subagent as soon as the parent starts replying before usage_update",
+    () =>
+      Effect.gen(function* () {
+        const fileSystem = yield* FileSystem.FileSystem;
+        const path = yield* Path.Path;
+        const profile = yield* fileSystem.makeTempDirectoryScoped({
+          prefix: "zerocode-antigravity-early-idle-",
+        });
+        const records = (conversationId: string, kind: string) =>
+          path.join(profile, "antigravity-acp", "brain", conversationId, ".system_generated", kind);
+        const write = (directory: string, name: string, value: unknown) =>
+          fileSystem
+            .makeDirectory(directory, { recursive: true })
+            .pipe(
+              Effect.andThen(
+                fileSystem.writeFileString(path.join(directory, name), JSON.stringify(value)),
+              ),
+            );
+        yield* write(records("mock-session-1", "subagents"), "child-1.json", {});
+        yield* write(records("child-1", "messages"), "launch.json", {
+          sender: "mock-session-1",
+          sourceMetadata: { tool: { toolCall: { id: "call_research", name: "invoke_subagent" } } },
+        });
+
+        const { usage, send, startTurn, until, throughPromptSettled } =
+          yield* openSessionWithRunningCommand({}, profile);
+        yield* startTurn(1, false);
+        yield* throughPromptSettled;
+
+        yield* write(records("mock-session-1", "messages"), "report.json", { sender: "child-1" });
+        yield* send({
+          sessionUpdate: "agent_message_chunk",
+          content: { type: "text", text: "Summarizing findings…" },
+        });
+        const idled = yield* until(
+          (event) => event.type === "subagent.updated" && event.subagent.status === "idle",
+        );
+        assert.isTrue(
+          idled.some((event) => event.type === "subagent.updated" && event.subagent.status === "idle"),
+        );
+
+        yield* send(usage);
+        yield* TestClock.adjust("3 seconds");
+        const terminal = (yield* until((event) => event.type === "turn.terminal")).at(-1);
+        assert.equal(terminal?.type === "turn.terminal" && terminal.status, "completed");
+      }).pipe(Effect.provide(layerSession)),
+  );
+
   it.effect("ends a continuation run whose replayed reply launched a subagent", () =>
     Effect.gen(function* () {
       const fileSystem = yield* FileSystem.FileSystem;

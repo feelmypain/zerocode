@@ -5120,6 +5120,26 @@ describe("parent run waiting on foreground subagents", () => {
     expect(liveRow([{ ...status, runId: RunId.make("other-run") }])).toEqual(thinking);
   });
 
+  it("names the running children when Gemini emits a completed thought before parking", () => {
+    const thought: OrchestrationV2TurnItem = {
+      ...base("thought", 5),
+      status: "completed",
+      type: "reasoning",
+      text: "Both subagents are running; I will wait for their results.",
+      streaming: false,
+    };
+    const status: OrchestrationV2TurnItem = {
+      ...base("status", 6),
+      status: "completed",
+      type: "assistant_message",
+      messageId: MessageId.make("status"),
+      text: "Waiting for subagents.",
+      streaming: false,
+    };
+    expect(liveRow([thought, status])).toEqual({ ...thinking, label: "Waiting on 2 subagents" });
+    expect(liveRow([thought])).toEqual({ ...thinking, label: "Waiting on 2 subagents" });
+  });
+
   it("keeps Thinking when a hidden newer parent command follows the children", () => {
     const command: OrchestrationV2TurnItem = {
       ...base("command", 5),

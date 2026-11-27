@@ -687,8 +687,16 @@ async function readDiskSwarmMembersByConversationId(
     if (convId === undefined || !NATIVE_ID.test(convId)) continue;
     const role = member.role ?? "worker";
     if (role === "coordinator") continue;
-    const killed = member.desired_state === "KILLED" || member.phase === "KILLED";
-    const parked = member.wake_mode === "mentions" || member.wake_mode === "anything";
+    const phase = member.phase?.trim().toUpperCase();
+    const desiredState = member.desired_state?.trim().toUpperCase();
+    const killed = desiredState === "KILLED" || phase === "KILLED";
+    const parked =
+      member.wake_mode === "mentions" ||
+      member.wake_mode === "anything" ||
+      desiredState === "STOPPED" ||
+      phase === "WAITING" ||
+      phase === "IDLE" ||
+      phase === "STOPPED";
     byConversation.set(convId, { name, role, killed, parked });
   }
   return byConversation;
@@ -910,11 +918,30 @@ export const readAntigravityPendingReply = Effect.fn("readAntigravityPendingRepl
   },
 );
 
+const TERMINAL_PLANNER_STATUSES = new Set(["DONE", "ERROR", "CANCELLED"]);
+
+async function isDetachedChildTranscriptIdle(
+  profileRoot: string,
+  childId: string,
+): Promise<boolean> {
+  const lastStep = await readLastTranscriptLine(profileRoot, childId);
+  if (
+    lastStep === undefined ||
+    lastStep.type !== "PLANNER_RESPONSE" ||
+    lastStep.status === undefined ||
+    !TERMINAL_PLANNER_STATUSES.has(lastStep.status.toUpperCase()) ||
+    (lastStep.tool_calls !== undefined && lastStep.tool_calls.length > 0)
+  ) {
+    return false;
+  }
+  return !(await hasUnreadWakingInboxMessage(profileRoot, childId));
+}
+
 /**
  * agy 1.5 children outlive their `invoke_subagent` call and the agent reports no end for them:
- * a child is done, or waits for guidance, once its message is in the parent's inbox or its record
- * says it was killed. Returns the launching tool call ids of children with neither; none when the
- * records prove nothing.
+ * a child is done, or waits for guidance, once its message is in the parent's inbox, its record
+ * says it stopped, or its transcript ends at a completed reply with no unread wake. Returns the
+ * launching tool call ids of children still working; none when the records prove nothing.
  */
 export const readAntigravityChildrenAtWork = Effect.fn("readAntigravityChildrenAtWork")(
   function* (input: {
@@ -944,7 +971,20 @@ export const readAntigravityChildrenAtWork = Effect.fn("readAntigravityChildrenA
         if (swarmMember?.killed === true || swarmMember?.parked === true) continue;
         // `manage_subagents` kill only marks the record; a killed child never reports.
         const subagent = await readDetachedSubagent(profileRoot, input.rootSessionId, childId);
-        if (subagent?.state === "SUBAGENT_STATE_KILLED") continue;
+        const subagentState = subagent?.state?.trim().toUpperCase();
+        if (
+          subagentState !== undefined &&
+          subagentState !== "SUBAGENT_STATE_ALIVE" &&
+          subagentState !== "SUBAGENT_STATE_RUNNING"
+        ) {
+          continue;
+        }
+        if (
+          swarmMember === undefined &&
+          (await isDetachedChildTranscriptIdle(profileRoot, childId))
+        ) {
+          continue;
+        }
         const directTaskId = `swarm:${childId}`;
         if (input.toolCallIds.includes(directTaskId)) {
           atWork.add(directTaskId);

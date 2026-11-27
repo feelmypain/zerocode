@@ -162,6 +162,7 @@ export const ACP_PROTOCOL = "acp.ndjson-jsonrpc" as const;
 const ACP_DEFERRED_FINALIZE_DEBOUNCE: Duration.Input = "3000 millis";
 // A model can stay silent this long before the first token of a reply the agent started itself.
 const ACP_OPEN_REPLY_QUIET_LIMIT: Duration.Input = "2 minutes";
+const ACP_SUBAGENT_POLL_INTERVAL: Duration.Input = "5 seconds";
 const ACP_BUSY_PROMPT_RETRY_INTERVAL: Duration.Input = "1 second";
 // Agents such as omp advertise a loaded session's commands shortly after answering session/load.
 const ACP_LOADED_COMMANDS_WAIT: Duration.Input = "2 seconds";
@@ -1818,6 +1819,7 @@ interface ActiveAcpTurn {
   /** Clock millis of the prompt's last progress, for `promptInactivityTimeout`. */
   lastProgressAt: number;
   inactivityWatchdog: Fiber.Fiber<void> | undefined;
+  subagentPollRunning: boolean;
 }
 
 const PROMPT_OUTCOME_CHECK_TIMEOUT = Duration.seconds(5);
@@ -2924,6 +2926,8 @@ export const makeAcpAdapterV2 = Effect.fn("makeAcpAdapterV2")(function* (
           if (live) yield* publishProviderThreadState(notification.sessionId, context);
         });
         let scheduleDeferredFinalize: (context: ActiveAcpTurn) => Effect.Effect<void> = () =>
+          Effect.void;
+        let scheduleSubagentPoll: (context: ActiveAcpTurn) => Effect.Effect<void> = () =>
           Effect.void;
         let refreshModelSwitchCapability: Effect.Effect<void> = Effect.void;
         let reportStartupPhase: (phase: string | undefined) => Effect.Effect<void> = () =>
@@ -4058,6 +4062,9 @@ export const makeAcpAdapterV2 = Effect.fn("makeAcpAdapterV2")(function* (
             );
           }
 
+          if (acpSubagentStatusIsTerminal(taskStatus)) {
+            yield* terminalizeSubagentTools(subagent);
+          }
           yield* flushSubagentAssistant(subagent);
           // A failed child's result explains the failure; it is not the child's reply.
           if (
@@ -4150,6 +4157,13 @@ export const makeAcpAdapterV2 = Effect.fn("makeAcpAdapterV2")(function* (
           });
           if (acpSubagentStatusIsTerminal(taskStatus)) {
             subagent.terminalStatusProjected = true;
+          } else if (
+            context.promptSettled &&
+            !context.finalized &&
+            !context.interrupted &&
+            acpSubagentStatusBlocksTurnSettlement(taskStatus)
+          ) {
+            yield* scheduleSubagentPoll(context);
           }
         });
 
@@ -6106,7 +6120,11 @@ export const makeAcpAdapterV2 = Effect.fn("makeAcpAdapterV2")(function* (
                 if (context.promptSettled) yield* idleReportedSubagents(context);
                 yield* rearmDeferredFinalize(context);
               } else if (acpRootSessionUpdateIngestsOutput(notification)) {
+                const wasReplyOpen = context.replyOpen;
                 context.replyOpen = true;
+                if (context.promptSettled && !wasReplyOpen) {
+                  yield* idleReportedSubagents(context);
+                }
               }
             }
           }
@@ -7039,6 +7057,9 @@ export const makeAcpAdapterV2 = Effect.fn("makeAcpAdapterV2")(function* (
           status: OrchestrationV2Subagent["status"],
           resultOverride?: string | null,
         ) {
+          if (acpSubagentStatusIsTerminal(status)) {
+            yield* terminalizeSubagentTools(subagent);
+          }
           yield* flushSubagentAssistant(subagent);
           yield* mutateCarryoverSubagentStatus(subagent, status, resultOverride);
           const now = subagent.task.updatedAt;
@@ -9193,6 +9214,45 @@ export const makeAcpAdapterV2 = Effect.fn("makeAcpAdapterV2")(function* (
           },
         );
 
+        scheduleSubagentPoll = Effect.fn("AcpAdapterV2.scheduleSubagentPoll")(function* (
+          context: ActiveAcpTurn,
+        ) {
+          if (flavor.subagentsOutlivingPrompt === undefined) return;
+          if (!context.promptSettled || context.finalized || context.interrupted) return;
+          if (context.subagentPollRunning) return;
+          const hasBlockingSubagents = () =>
+            [...context.subagents.values()].some((subagent) =>
+              acpSubagentStatusBlocksTurnSettlement(subagent.task.status),
+            );
+          if (!hasBlockingSubagents()) return;
+          context.subagentPollRunning = true;
+          yield* Effect.gen(function* () {
+            while (
+              !context.finalized &&
+              !context.interrupted &&
+              context.promptSettled &&
+              hasBlockingSubagents()
+            ) {
+              yield* Effect.sleep(ACP_SUBAGENT_POLL_INTERVAL);
+              yield* runtimeCallbackPermit.withPermit(
+                Effect.gen(function* () {
+                  if (!context.promptSettled || context.finalized || context.interrupted) return;
+                  yield* idleReportedSubagents(context);
+                  yield* rearmDeferredFinalize(context);
+                }),
+              );
+            }
+          }).pipe(
+            Effect.ensuring(
+              Effect.sync(() => {
+                context.subagentPollRunning = false;
+              }),
+            ),
+            Effect.forkIn(sessionScope),
+            Effect.asVoid,
+          );
+        });
+
         const promptInactivityPaused = Effect.fn("AcpAdapterV2.promptInactivityPaused")(function* (
           context: ActiveAcpTurn,
         ) {
@@ -9723,6 +9783,7 @@ export const makeAcpAdapterV2 = Effect.fn("makeAcpAdapterV2")(function* (
                   if (deferredBackgroundWork || pendingReply) {
                     yield* closeTextStreams(context);
                     yield* schedulePostSettleHoldExpiry(context);
+                    yield* scheduleSubagentPoll(context);
                     if (pendingReply) {
                       context.replyOpen = true;
                       yield* scheduleDeferredFinalize(context);
@@ -10001,6 +10062,7 @@ export const makeAcpAdapterV2 = Effect.fn("makeAcpAdapterV2")(function* (
               nativePromptId: undefined,
               lastProgressAt: 0,
               inactivityWatchdog: undefined,
+              subagentPollRunning: false,
             };
             const carryover = yield* Ref.getAndSet(carryoverSubagents, null);
             let rehydratedCarryoverSubagents: ReadonlyArray<ActiveAcpSubagent> = [];
@@ -10136,6 +10198,7 @@ export const makeAcpAdapterV2 = Effect.fn("makeAcpAdapterV2")(function* (
               }
               if (!context.finalized) {
                 yield* schedulePostSettleHoldExpiry(context);
+                yield* scheduleSubagentPoll(context);
                 if (hasDeferredBackgroundWork(context)) {
                   yield* rearmDeferredFinalize(context);
                 } else {

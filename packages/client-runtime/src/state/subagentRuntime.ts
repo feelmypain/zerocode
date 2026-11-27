@@ -424,6 +424,7 @@ export function workflowOpeningParentThreadId(input: {
 
 const WORKFLOW_AGENT_COUNTS = {
   working: msg("{count} working"),
+  idle: msg("{count} idle"),
   done: msg("{count} done"),
   failed: msg("{count} failed"),
   stopped: msg("{count} stopped"),
@@ -454,7 +455,9 @@ export function workflowOpeningHeadline(
         : member.status === "failed"
           ? "failed"
           : "stopped"
-      : "working";
+      : member.status === "idle"
+        ? "idle"
+        : "working";
     counts.set(key, (counts.get(key) ?? 0) + 1);
   }
   const agents =
@@ -466,7 +469,7 @@ export function workflowOpeningHeadline(
               count: members.length,
             }),
           ),
-          ...(["working", "done", "failed", "stopped"] as const)
+          ...(["working", "idle", "done", "failed", "stopped"] as const)
             .filter((key) => counts.has(key))
             .map((key) => resolve(WORKFLOW_AGENT_COUNTS[key], { count: counts.get(key)! })),
         ].join(" · ");
